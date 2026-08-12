@@ -39,6 +39,10 @@
     backdrop-filter:blur(6px);
     border-bottom:1.5px solid var(--ink);
   }
+
+  .header-actions{
+    display:flex; align-items:centre;gap:10px;
+  }
   .site-inner{
     max-width:1180px; margin:0 auto;
     display:flex; align-items:center; justify-content:space-between;
@@ -63,6 +67,23 @@
     font-family:var(--font-mono); font-size:13px; font-weight:500;
     transition:background .15s ease;
   }
+    .sign-In{
+    display:flex; align-items:center; gap:10px;
+    background:var(--ink); color:var(--paper);
+    border:none; border-radius:3px;
+    padding:10px 16px; cursor:pointer;
+    font-family:var(--font-mono); font-size:13px; font-weight:500;
+    transition:background .15s ease;
+  }
+
+  .nav-actions{
+    display:flex;
+    align-items:center;
+    gap:15px;
+    justify-content:flex-end;
+  }
+
+
   .cart-btn:hover{ background:var(--copper-dk); }
   .cart-count{
     background:var(--gold); color:var(--ink);
@@ -70,6 +91,25 @@
     display:flex; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; padding:0 4px;
   }
+
+  nav ul {
+    display:flex;
+    list-style: none;
+    gap:35px;
+  }
+
+  nav a {
+    text-decoration:none;
+    color: var(--ink);
+    font-weight:600;
+    font-size:16px;
+
+  }
+
+.nav-buttons{
+    display:flex;
+    gap:15px;
+}
 
   /* ============ HERO ============ */
   .hero{

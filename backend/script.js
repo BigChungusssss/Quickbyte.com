@@ -149,7 +149,7 @@ function cardHTML(catKey, i, item){
         ${item.variants.map((v,vi)=>`<option value="${vi}">${v.label}</option>`).join('')}
       </select>
       ${catKey==='resistors' ? `<div class="band-preview" id="bands-${id}">${bandPreviewHTML(first)}</div>` : ''}
-      <div class="spec-row"><span>UNIT PRICE</span><span id="price-${id}"></span></div>
+      <div class="spec-row"><span></span><span id="price-${id}"></span></div>
       <div class="card-foot">
         <div class="qty">
           <button data-act="dec">−</button>
