@@ -1,48 +1,73 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Quick-bite.com</title>
-    <!--Link to font awesome for inserting icons-->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.0/css/all.min.css" integrity="sha512-ApSLB1Pd3/bZN8fWB/RG9YhN/7bd9Hkf3AGaE2mPfebjrxagjuBtx2GcgdqIlJkUzwylBo61r9Xa9NmgBI0swA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-    <!--link to css file-->
-    <link rel="stylesheet" href ="style.css">
-    
-
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>V-Max-Components</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.3.0/css/all.min.css" integrity="sha512-ApSLB1Pd3/bZN8fWB/RG9YhN/7bd9Hkf3AGaE2mPfebjrxagjuBtx2GcgdqIlJkUzwylBo61r9Xa9NmgBI0swA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+<link rel="stylesheet" href="backend/style.css">
 </head>
 <body>
-    <header>
-        <div class="container header-container">
-            <a href="#" class="logo">
-                <!--insert icons here-->
-                <i class="fa-solid fa-cookie-bite logo-icon"></i>
-                <div class="logo-text">Brew<span>Haven</span></div>
 
+<header class="site">
+  <div class="site-inner">
+    <div class="brand">
+        <i class="fa-brands fa-raspberry-pi logo-icon"></i>
 
-            </a>
-            <nav>
-                <ul>
-                    <li><a href="#">Home</a></li>
-                    <li><a href="#products">Products</a></li>
-                    <li><a href= "#">Locations</a></li>
-                    <li><a href="#">Contacts</a></li>
-                </ul>
-            </nav>
-            <div class="nav-buttons">
-                <a href="#" class="btn btn-secondary">Sign In</a>
-                <a href="#" class="btn btn-primary">Order Online</a>
-            </div>
-        </div>
-    </header>
-	
+      <div>
+        <div class="brand-name">V-max</span></div>
+        
+      </div>
+    </div>
+    <button class="cart-btn" id="openDrawer">
+      ORDER <span class="cart-count" id="cartCount">0</span>
+    </button>
+  </div>
+</header>
 
+<section class="hero">
+  <div>
+    <h1>Pick the value.<br>Not the aisle.<br><em>Add it to the order.</em></h1>
+    <p>Resistors, capacitors and inductors, browsed by the number printed on the part — not by brand. Choose a value and tolerance, set the quantity, and it's queued for your order.</p>
+  </div>
+  <svg class="hero-trace" viewBox="0 0 300 140" fill="none">
+    <path d="M0 70 H60 L75 40 L90 100 L105 40 L120 70 H160" stroke="#1C2420" stroke-width="2" fill="none"/>
+    <circle cx="160" cy="70" r="4" fill="#B5651D"/>
+    <path d="M160 70 H190" stroke="#1C2420" stroke-width="2"/>
+    <rect x="190" y="55" width="10" height="30" fill="none" stroke="#1C2420" stroke-width="2"/>
+    <rect x="192" y="55" width="2" height="30" fill="#1F4B44"/>
+    <rect x="196" y="55" width="2" height="30" fill="#C9A227"/>
+    <path d="M210 70 H240" stroke="#1C2420" stroke-width="2"/>
+    <path d="M240 70 q6 -14 12 0 t12 0 t12 0 t12 0" stroke="#1C2420" stroke-width="2" fill="none"/>
+    <path d="M300 70 H288" stroke="#1C2420" stroke-width="2"/>
+  </svg>
+</section>
 
+<nav class="cats" id="catNav"></nav>
 
+<main id="main"></main>
 
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer">
+  <div class="drawer-head">
+    <h2>Your order</h2>
+    <button class="drawer-close" id="closeDrawer">✕</button>
+  </div>
+  <div class="drawer-items" id="drawerItems"></div>
+  <div class="drawer-foot">
+    <div class="drawer-total"><span>Total</span><span id="drawerTotal">0000</span></div>
+    <button class="checkout-btn" id="checkoutBtn">Send order to supplier</button>
+    <div class="checkout-note">Checkout will email this list to the provider — coming next.</div>
+  </div>
+</aside>
 
+<footer>R·C·L SUPPLY — layout preview. Catalog data lives in one array at the top of the script, so new parts are one object each.</footer>
 
-    <!--Link to Javascript file-->
-    <script src="script.js"></script>
+<script src = "backend/script.js">
+    
+
+</script>
 </body>
 </html>
