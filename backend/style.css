@@ -83,6 +83,10 @@
     justify-content:flex-end;
   }
 
+  .sign-In:hover{
+    background:var(--ink-soft);
+  }
+
 
   .cart-btn:hover{ background:var(--copper-dk); }
   .cart-count{
@@ -103,7 +107,26 @@
     color: var(--ink);
     font-weight:600;
     font-size:16px;
+    position:relative;
+    padding: 5px;
+    transition: all 0.3s ease;
 
+  }
+
+  nav a:after{
+    content:'';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: var(--gold);
+    transition: width 0.3s ease;
+
+  }
+
+  nav a:hover:after{
+    width: 100%;
   }
 
 .nav-buttons{

@@ -1,9 +1,4 @@
-/* ================= PRODUCT DATA =================
-   To add a new part: push one object into the matching
-   category array below. Each variant becomes an entry in
-   the dropdown; "bands" is optional and only used for the
-   live resistor colour-band preview.
-==================================================== */
+
 const CATALOG = {
   resistors: {
     label: "Resistors",
@@ -221,6 +216,7 @@ function renderDrawer(){
   cartCount.textContent = order.reduce((s,o)=>s+o.qty,0);
   if(order.length===0){
     drawerItems.innerHTML = `<div class="drawer-empty">Nothing added yet.<br>Pick a value and hit "Add to order".</div>`;
+    drawerTotal.textContent = `0 items`;
     return;
   }
   drawerItems.innerHTML = order.map(o=>`
@@ -242,6 +238,7 @@ function renderDrawer(){
     });
   });
   const total = order.reduce((s,o)=>s+o.qty,0)
+
   drawerTotal.textContent = `${total} items`;
 }
 
