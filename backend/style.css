@@ -1,15 +1,15 @@
-  /* ============ DESIGN TOKENS ============ */
+
   :root{
-    --paper:      #F5F2E6;   /* graph-paper cream base */
-    --paper-line: #DAD6C4;   /* faint grid lines on paper */
-    --ink:        #1C2420;   /* near-black, schematic ink */
-    --ink-soft:   #4B5750;   /* secondary text */
-    --card:       #FDFCF7;   /* component card surface */
-    --line:       #C8C2AC;   /* hairline / dashed silkscreen */
-    --copper:     #B5651D;   /* primary accent — copper trace */
+    --paper:      #F5F2E6;   
+    --paper-line: #DAD6C4;   
+    --ink:        #1C2420;   
+    --ink-soft:   #4B5750;   
+    --card:       #FDFCF7;   
+    --line:       #C8C2AC;   
+    --copper:     #B5651D;   
     --copper-dk:  #8C4B14;
-    --teal:       #1F4B44;   /* deep schematic teal */
-    --gold:       #C9A227;   /* resistor gold-band accent */
+    --teal:       #1F4B44;   
+    --gold:       #C9A227;   
     --danger:     #A23B2E;
 
     --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
