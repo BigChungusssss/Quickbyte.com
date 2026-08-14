@@ -1,28 +1,83 @@
-/* ================= STATE & DATA FETCH ================= */
-let CATALOG = {}; // Holds fetched JSON data
-let activeCat = "resistors";
-let order = []; // {key, name, type, variantLabel, price, qty}
+/* ================= CONFIG ================= */
+// Paste the "Publish to web" CSV link from the client's Google Sheet here.
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRtBKzhJV6QX8i1cK_x6ltzZfo9J5wDxdiRCpmCk-AvsbG7EPAP1o8B8Y1JgE_6P8-Y_Knhtk1NZxYy/pub?gid=1974837864&single=true&output=csv";
 
-// Asynchronously load the catalog data from catalog.json
+/* ================= STATE ================= */
+let CATALOG = {}; // Rebuilt from sheet rows: { category: { label, color, icon, items:[{name,type,variants:[...]}] } }
+let activeCat = "";
+let order = []; // {key, name, variantLabel, price, qty}
+
+/* ================= AUTO ICON (no code changes needed for new categories) ================= */
+// Generates a simple colored circle with the category's initial letter.
+function autoIcon(label, color){
+  const letter = (label || "?").trim().charAt(0).toUpperCase();
+  return `<svg viewBox="0 0 80 30" fill="none">
+    <circle cx="15" cy="15" r="12" fill="${color}" />
+    <text x="15" y="20" text-anchor="middle" font-size="14" font-family="sans-serif" fill="#fff">${letter}</text>
+  </svg>`;
+}
+
+/* ================= BUILD CATALOG FROM SHEET ROWS ================= */
+function buildCatalogFromRows(rows) {
+  const catalog = {};
+
+  rows.forEach(row => {
+    const catKey = (row.category || "").trim();
+    if (!catKey) return; // skip blank rows
+
+    const catLabel = (row.category_label || catKey).trim();
+    const catColor = (row.category_color || "#555555").trim();
+
+    const itemName = (row.item_name || "").trim();
+    const itemType = (row.item_type || "").trim();
+    const variantLabel = (row.variant_label || "").trim();
+    const price = parseFloat(row.price);
+    const inStock = String(row.inStock).trim().toUpperCase() !== "FALSE";
+    const bandsRaw = (row.bands || "").trim();
+    const bands = bandsRaw ? bandsRaw.split(",").map(b => b.trim()).filter(Boolean) : null;
+
+    if (!catalog[catKey]) {
+      catalog[catKey] = {
+        label: catLabel,
+        color: catColor,
+        icon: autoIcon(catLabel, catColor),
+        items: []
+      };
+    }
+
+    let item = catalog[catKey].items.find(it => it.name === itemName);
+    if (!item) {
+      item = { name: itemName, type: itemType, variants: [] };
+      catalog[catKey].items.push(item);
+    }
+
+    item.variants.push({
+      label: variantLabel,
+      price: isNaN(price) ? null : price,
+      inStock,
+      ...(bands ? { bands } : {})
+    });
+  });
+
+  return catalog;
+}
+
+/* ================= FETCH ================= */
 async function loadCatalog() {
   try {
-    const response = await fetch('./catalog.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    CATALOG = await response.json();
+    const response = await fetch(SHEET_CSV_URL);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const csvText = await response.text();
 
-    // Set default active category to the first key in the JSON object
-    activeCat = Object.keys(CATALOG)[0] || "resistors";
+    const parsed = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+    CATALOG = buildCatalogFromRows(parsed.data);
 
-    // Initialize UI after data is ready
+    activeCat = Object.keys(CATALOG)[0] || "";
     initApp();
   } catch (error) {
     console.error("Failed to load component catalog:", error);
     const main = document.getElementById('main');
-    if (main) {
-      main.innerHTML = `<p class="error">Failed to load catalog data. Please check connection.</p>`;
-    }
+    if (main) main.innerHTML = `<p class="error">Failed to load catalog data. Please check connection.</p>`;
   }
 }
 
@@ -30,8 +85,8 @@ async function loadCatalog() {
 const catNav = document.getElementById('catNav');
 function renderNav(){
   catNav.innerHTML = Object.entries(CATALOG).map(([key, cat]) => `
-    <button class="cat-tab ${key===activeCat?'active':''}" data-cat="${key}">
-      <span class="band-strip">${cat.swatch.map(c=>`<span class="band" style="background:${c}"></span>`).join('')}</span>
+    <button class="cat-tab ${key===activeCat?'active':''}" data-cat="${key}" style="--cat-color:${cat.color}">
+      <span class="card-icon" style="width:24px;display:inline-block;vertical-align:middle;margin-right:6px;">${cat.icon}</span>
       ${cat.label}
     </button>
   `).join('');
@@ -70,8 +125,8 @@ function cardHTML(catKey, i, item){
       <select class="variant" id="variant-${id}">
         ${item.variants.map((v,vi)=>`<option value="${vi}" ${v.inStock == false ? 'disabled' : ''}>${v.label} ${v.inStock == false ? 'OutofStock' : ''}</option>`).join('')}
       </select>
-      ${catKey==='resistors' ? `<div class="band-preview" id="bands-${id}">${bandPreviewHTML(first)}</div>` : ''}
-      <div class="spec-row"><span></span><span id="price-${id}"></span></div>
+      ${item.variants.some(v=>v.bands) ? `<div class="band-preview" id="bands-${id}">${bandPreviewHTML(first)}</div>` : ''}
+      <div class="spec-row"><span></span><span id="price-${id}">${first.price != null ? '$' + first.price.toFixed(2) : ''}</span></div>
       <div class="card-foot">
         <div class="qty">
           <button data-act="dec">−</button>
@@ -105,6 +160,7 @@ function wireCard(catKey, i, item){
   select.addEventListener('change', ()=>{
     const v = currentVariant();
     if(bandsEl) bandsEl.innerHTML = bandPreviewHTML(v);
+    if(priceEl) priceEl.textContent = v.price != null ? '$' + v.price.toFixed(2) : '';
   });
 
   card.querySelectorAll('.qty button').forEach(btn=>{
@@ -122,7 +178,7 @@ function wireCard(catKey, i, item){
     const existing = order.find(o=>o.key===key);
     if(existing){ existing.qty += qty; }
     else{
-      order.push({ key, name:item.name, variantLabel:v.label, qty });
+      order.push({ key, name:item.name, variantLabel:v.label, price: v.price, qty });
     }
     addBtn.textContent = "Added ✓";
     addBtn.classList.add('added');
@@ -164,7 +220,6 @@ function renderDrawer(){
     });
   });
   const total = order.reduce((s,o)=>s+o.qty,0);
-
   drawerTotal.textContent = `${total} items`;
 }
 
@@ -184,5 +239,4 @@ function initApp() {
   renderDrawer();
 }
 
-// Start loading data on load
 loadCatalog();
