@@ -59,15 +59,16 @@ function cardHTML(catKey, i, item){
   const cat = CATALOG[catKey];
   const id = `${catKey}-${i}`;
   const first = item.variants[0];
+  const isAvailable = first.inStock !== false;
   return `
-    <div class="card" data-id="${id}">
+    <div class="card ${!isAvailable ? 'out-of-stock' : ''}" data-id="${id}">
       <div class="card-icon">${cat.icon}</div>
       <div>
         <p class="card-title">${item.name}</p>
         <div class="card-type">${item.type}</div>
       </div>
       <select class="variant" id="variant-${id}">
-        ${item.variants.map((v,vi)=>`<option value="${vi}">${v.label}</option>`).join('')}
+        ${item.variants.map((v,vi)=>`<option value="${vi}" ${v.inStock == false ? 'disabled' : ''}>${v.label} ${v.inStock == false ? 'OutofStock' : ''}</option>`).join('')}
       </select>
       ${catKey==='resistors' ? `<div class="band-preview" id="bands-${id}">${bandPreviewHTML(first)}</div>` : ''}
       <div class="spec-row"><span></span><span id="price-${id}"></span></div>
@@ -79,7 +80,7 @@ function cardHTML(catKey, i, item){
         </div>
         <div class="price"><small>× qty</small></div>
       </div>
-      <button class="add-btn" id="add-${id}">Add to order</button>
+      <button class="add-btn" id="add-${id}">Add to Order</button>
     </div>
   `;
 }

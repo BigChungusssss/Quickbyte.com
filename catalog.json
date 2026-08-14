@@ -8,7 +8,7 @@
         "name": "Carbon Film Resistor",
         "type": "1/4W · axial",
         "variants": [
-          { "label": "100 Ω ± 5%", "bands": ["#8a5a2b", "#1c2420", "#8a5a2b", "#C9A227"], "inStock": true },
+          { "label": "100 Ω ± 5%", "bands": ["#8a5a2b", "#1c2420", "#8a5a2b", "#C9A227"], "inStock": false },
           { "label": "220 Ω ± 5%", "bands": ["#a23b2e", "#a23b2e", "#8a5a2b", "#C9A227"], "inStock": true },
           { "label": "1 kΩ ± 5%", "bands": ["#8a5a2b", "#1c2420", "#a23b2e", "#C9A227"], "inStock": true },
           { "label": "4.7 kΩ ± 5%", "bands": ["#eab308", "#a23b2e", "#a23b2e", "#C9A227"], "inStock": true },
@@ -45,7 +45,7 @@
         "name": "Ceramic Disc Capacitor",
         "type": "50V · X7R",
         "variants": [
-          { "label": "100 pF", "inStock": true },
+          { "label": "100 pF", "inStock": false },
           { "label": "1 nF", "inStock": true },
           { "label": "10 nF", "inStock": true },
           { "label": "100 nF", "inStock": true }
