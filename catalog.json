@@ -1,0 +1,98 @@
+{
+  "resistors": {
+    "label": "Resistors",
+    "swatch": ["#7a4a2a", "#1c2420", "#a23b2e"],
+    "icon": "<svg viewBox=\"0 0 80 30\" fill=\"none\"><path d=\"M0 15H18L23 4L31 26L39 4L47 26L55 4L60 15H80\" stroke=\"#1C2420\" stroke-width=\"2.5\" fill=\"none\"/></svg>",
+    "items": [
+      {
+        "name": "Carbon Film Resistor",
+        "type": "1/4W · axial",
+        "variants": [
+          { "label": "100 Ω ± 5%", "bands": ["#8a5a2b", "#1c2420", "#8a5a2b", "#C9A227"], "inStock": true },
+          { "label": "220 Ω ± 5%", "bands": ["#a23b2e", "#a23b2e", "#8a5a2b", "#C9A227"], "inStock": true },
+          { "label": "1 kΩ ± 5%", "bands": ["#8a5a2b", "#1c2420", "#a23b2e", "#C9A227"], "inStock": true },
+          { "label": "4.7 kΩ ± 5%", "bands": ["#eab308", "#a23b2e", "#a23b2e", "#C9A227"], "inStock": true },
+          { "label": "10 kΩ ± 5%", "bands": ["#8a5a2b", "#1c2420", "#eab308", "#C9A227"], "inStock": true },
+          { "label": "47 kΩ ± 5%", "bands": ["#eab308", "#a23b2e", "#eab308", "#C9A227"], "inStock": true }
+        ]
+      },
+      {
+        "name": "Metal Film Resistor",
+        "type": "1/4W · 1% precision",
+        "variants": [
+          { "label": "330 Ω ± 1%", "bands": ["#a23b2e", "#8a5a2b", "#1c2420", "#a23b2e"], "inStock": true },
+          { "label": "2.2 kΩ ± 1%", "bands": ["#a23b2e", "#a23b2e", "#1c2420", "#a23b2e"], "inStock": true },
+          { "label": "100 kΩ ± 1%", "bands": ["#8a5a2b", "#1c2420", "#eab308", "#a23b2e"], "inStock": true }
+        ]
+      },
+      {
+        "name": "Trimmer Potentiometer",
+        "type": "single-turn · 3296",
+        "variants": [
+          { "label": "1 kΩ", "inStock": true },
+          { "label": "10 kΩ", "inStock": true },
+          { "label": "100 kΩ", "inStock": true }
+        ]
+      }
+    ]
+  },
+  "capacitors": {
+    "label": "Capacitors",
+    "swatch": ["#1F4B44", "#2f6f63", "#C9A227"],
+    "icon": "<svg viewBox=\"0 0 80 30\" fill=\"none\"><path d=\"M0 15H32M48 15H80\" stroke=\"#1C2420\" stroke-width=\"2.5\"/><path d=\"M32 3V27M48 3V27\" stroke=\"#1C2420\" stroke-width=\"3\"/></svg>",
+    "items": [
+      {
+        "name": "Ceramic Disc Capacitor",
+        "type": "50V · X7R",
+        "variants": [
+          { "label": "100 pF", "inStock": true },
+          { "label": "1 nF", "inStock": true },
+          { "label": "10 nF", "inStock": true },
+          { "label": "100 nF", "inStock": true }
+        ]
+      },
+      {
+        "name": "Electrolytic Capacitor",
+        "type": "radial · 25V",
+        "variants": [
+          { "label": "1 µF", "inStock": true },
+          { "label": "10 µF", "inStock": true },
+          { "label": "100 µF", "inStock": true },
+          { "label": "1000 µF", "inStock": true }
+        ]
+      },
+      {
+        "name": "Film Capacitor",
+        "type": "polyester · 63V",
+        "variants": [
+          { "label": "10 nF", "inStock": true },
+          { "label": "100 nF", "inStock": true }
+        ]
+      }
+    ]
+  },
+  "inductors": {
+    "label": "Inductors",
+    "swatch": ["#B5651D", "#8C4B14", "#eab308"],
+    "icon": "<svg viewBox=\"0 0 80 30\" fill=\"none\"><path d=\"M0 15H14\" stroke=\"#1C2420\" stroke-width=\"2.5\"/><path d=\"M14 15q6 -14 13 0t13 0t13 0t13 0\" stroke=\"#1C2420\" stroke-width=\"2.5\" fill=\"none\"/><path d=\"M66 15H80\" stroke=\"#1C2420\" stroke-width=\"2.5\"/></svg>",
+    "items": [
+      {
+        "name": "Radial Leaded Inductor",
+        "type": "through-hole",
+        "variants": [
+          { "label": "10 µH", "inStock": true },
+          { "label": "100 µH", "inStock": true },
+          { "label": "1 mH", "inStock": true }
+        ]
+      },
+      {
+        "name": "Toroidal Choke",
+        "type": "power-line filter",
+        "variants": [
+          { "label": "1 mH", "inStock": true },
+          { "label": "10 mH", "inStock": true }
+        ]
+      }
+    ]
+  }
+}

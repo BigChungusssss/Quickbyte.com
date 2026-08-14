@@ -1,106 +1,30 @@
-
-const CATALOG = {
-  resistors: {
-    label: "Resistors",
-    swatch: ["#7a4a2a","#1c2420","#a23b2e"],
-    icon: `<svg viewBox="0 0 80 30" fill="none"><path d="M0 15H18L23 4L31 26L39 4L47 26L55 4L60 15H80" stroke="#1C2420" stroke-width="2.5" fill="none"/></svg>`,
-    items: [
-      {
-        name: "Carbon Film Resistor",
-        type: "1/4W · axial",
-        variants: [
-          { label: "100 Ω ± 5%", bands:["#8a5a2b","#1c2420","#8a5a2b","#C9A227"] },
-          { label: "220 Ω ± 5%", bands:["#a23b2e","#a23b2e","#8a5a2b","#C9A227"] },
-          { label: "1 kΩ ± 5%", bands:["#8a5a2b","#1c2420","#a23b2e","#C9A227"] },
-          { label: "4.7 kΩ ± 5%", bands:["#eab308","#a23b2e","#a23b2e","#C9A227"] },
-          { label: "10 kΩ ± 5%", bands:["#8a5a2b","#1c2420","#eab308","#C9A227"] },
-          { label: "47 kΩ ± 5%", bands:["#eab308","#a23b2e","#eab308","#C9A227"] },
-        ]
-      },
-      {
-        name: "Metal Film Resistor",
-        type: "1/4W · 1% precision",
-        variants: [
-          { label: "330 Ω ± 1%", bands:["#a23b2e","#8a5a2b","#1c2420","#a23b2e"] },
-          { label: "2.2 kΩ ± 1%", bands:["#a23b2e","#a23b2e","#1c2420","#a23b2e"] },
-          { label: "100 kΩ ± 1%", bands:["#8a5a2b","#1c2420","#eab308","#a23b2e"] },
-        ]
-      },
-      {
-        name: "Trimmer Potentiometer",
-        type: "single-turn · 3296",
-        variants: [
-          { label: "1 kΩ"},
-          { label: "10 kΩ"},
-          { label: "100 kΩ"},
-        ]
-      }
-    ]
-  },
-  capacitors: {
-    label: "Capacitors",
-    swatch: ["#1F4B44","#2f6f63","#C9A227"],
-    icon: `<svg viewBox="0 0 80 30" fill="none"><path d="M0 15H32M48 15H80" stroke="#1C2420" stroke-width="2.5"/><path d="M32 3V27M48 3V27" stroke="#1C2420" stroke-width="3"/></svg>`,
-    items: [
-      {
-        name: "Ceramic Disc Capacitor",
-        type: "50V · X7R",
-        variants: [
-          { label: "100 pF"},
-          { label: "1 nF" },
-          { label: "10 nF"},
-          { label: "100 nF"},
-        ]
-      },
-      {
-        name: "Electrolytic Capacitor",
-        type: "radial · 25V",
-        variants: [
-          { label: "1 µF" },
-          { label: "10 µF"},
-          { label: "100 µF"},
-          { label: "1000 µF"},
-        ]
-      },
-      {
-        name: "Film Capacitor",
-        type: "polyester · 63V",
-        variants: [
-          { label: "10 nF"},
-          { label: "100 nF"},
-        ]
-      }
-    ]
-  },
-  inductors: {
-    label: "Inductors",
-    swatch: ["#B5651D","#8C4B14","#eab308"],
-    icon: `<svg viewBox="0 0 80 30" fill="none"><path d="M0 15H14" stroke="#1C2420" stroke-width="2.5"/><path d="M14 15q6 -14 13 0t13 0t13 0t13 0" stroke="#1C2420" stroke-width="2.5" fill="none"/><path d="M66 15H80" stroke="#1C2420" stroke-width="2.5"/></svg>`,
-    items: [
-      {
-        name: "Radial Leaded Inductor",
-        type: "through-hole",
-        variants: [
-          { label: "10 µH"},
-          { label: "100 µH"},
-          { label: "1 mH" },
-        ]
-      },
-      {
-        name: "Toroidal Choke",
-        type: "power-line filter",
-        variants: [
-          { label: "1 mH"},
-          { label: "10 mH"},
-        ]
-      }
-    ]
-  }
-};
-
-/* ================= STATE ================= */
+/* ================= STATE & DATA FETCH ================= */
+let CATALOG = {}; // Holds fetched JSON data
 let activeCat = "resistors";
 let order = []; // {key, name, type, variantLabel, price, qty}
+
+// Asynchronously load the catalog data from catalog.json
+async function loadCatalog() {
+  try {
+    const response = await fetch('./catalog.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    CATALOG = await response.json();
+
+    // Set default active category to the first key in the JSON object
+    activeCat = Object.keys(CATALOG)[0] || "resistors";
+
+    // Initialize UI after data is ready
+    initApp();
+  } catch (error) {
+    console.error("Failed to load component catalog:", error);
+    const main = document.getElementById('main');
+    if (main) {
+      main.innerHTML = `<p class="error">Failed to load catalog data. Please check connection.</p>`;
+    }
+  }
+}
 
 /* ================= RENDER: CATEGORY NAV ================= */
 const catNav = document.getElementById('catNav');
@@ -120,6 +44,8 @@ function renderNav(){
 const main = document.getElementById('main');
 function renderGrid(){
   const cat = CATALOG[activeCat];
+  if (!cat) return;
+
   main.innerHTML = `
     <div class="section-label">${cat.label}</div>
     <div class="grid">
@@ -177,7 +103,6 @@ function wireCard(catKey, i, item){
 
   select.addEventListener('change', ()=>{
     const v = currentVariant();
-    //priceEl.textContent = `R${v.price.toFixed(2)}`;
     if(bandsEl) bandsEl.innerHTML = bandPreviewHTML(v);
   });
 
@@ -237,7 +162,7 @@ function renderDrawer(){
       renderDrawer();
     });
   });
-  const total = order.reduce((s,o)=>s+o.qty,0)
+  const total = order.reduce((s,o)=>s+o.qty,0);
 
   drawerTotal.textContent = `${total} items`;
 }
@@ -252,6 +177,11 @@ document.getElementById('checkoutBtn').addEventListener('click', ()=>{
 });
 
 /* ================= INIT ================= */
-renderNav();
-renderGrid();
-renderDrawer();
+function initApp() {
+  renderNav();
+  renderGrid();
+  renderDrawer();
+}
+
+// Start loading data on load
+loadCatalog();
