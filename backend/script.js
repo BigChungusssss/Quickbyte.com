@@ -1,7 +1,55 @@
+
+if (!window.storage) {
+  window.storage = {
+    async get(key) {
+      const val = localStorage.getItem(key);
+      return val ? { value: val } : null;
+    },
+    async set(key, value) {
+      localStorage.setItem(key, value);
+    },
+    async delete(key) {
+      localStorage.removeItem(key);
+    }
+  };
+}
+
+async function getActiveSession(){
+  try{
+    const res = await window.storage.get('active-session', false);
+    return res ? JSON.parse(res.value) : null;
+  }catch(e){ return null; }
+}
+
+async function applySignInState(){
+  const session = await getActiveSession();
+  const signInBtn = document.getElementById('SignIN');
+  const greetingEl = document.getElementById('greeting');
+  if (!signInBtn) return;
+
+  if (session){
+    signInBtn.textContent = session.name.split(' ')[0];
+    signInBtn.onclick = () => { window.location.href = 'Sign/signin.html'; };
+    if (greetingEl){
+      greetingEl.textContent = `${session.name}, from ${session.courseCode} in ${session.degree}, Group ${session.groupNumber}`;
+    }
+  } else {
+    signInBtn.textContent = 'Sign IN';
+    signInBtn.onclick = () => { window.location.href = 'Sign/signin.html'; };
+    if (greetingEl) greetingEl.textContent = '';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', applySignInState);
+
+
+
 /* ================= CONFIG ================= */
+
+
 // Paste the "Publish to web" CSV link from the client's Google Sheet here.
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRtBKzhJV6QX8i1cK_x6ltzZfo9J5wDxdiRCpmCk-AvsbG7EPAP1o8B8Y1JgE_6P8-Y_Knhtk1NZxYy/pub?gid=1974837864&single=true&output=csv";
-
+const API_BASE_URL = "http://localhost:3000"; 
 /* ================= STATE ================= */
 let CATALOG = {}; // Rebuilt from sheet rows: { category: { label, color, icon, items:[{name,type,variants:[...]}] } }
 let activeCat = "";
@@ -81,6 +129,17 @@ async function loadCatalog() {
   }
 }
 
+
+async function saveCart(){
+  try{ await window.storage.set('cart', JSON.stringify(order), false); }catch(e){}
+}
+
+async function loadCart(){
+  try{
+    const res = await window.storage.get('cart', false);
+    order = res ? JSON.parse(res.value) : [];
+  }catch(e){ order = []; }
+}
 /* ================= RENDER: CATEGORY NAV ================= */
 const catNav = document.getElementById('catNav');
 function renderNav(){
@@ -184,6 +243,7 @@ function wireCard(catKey, i, item){
     addBtn.classList.add('added');
     setTimeout(()=>{ addBtn.textContent="Add to order"; addBtn.classList.remove('added'); }, 900);
     renderDrawer();
+    saveCart();
   });
 }
 
@@ -228,15 +288,80 @@ document.getElementById('closeDrawer').addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
 function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove('show'); }
 
-document.getElementById('checkoutBtn').addEventListener('click', ()=>{
-  alert('Layout preview only — emailing the order to the supplier is the next step.');
+document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
+  const errorEl = document.getElementById('checkoutError');
+  if(errorEl) errorEl.textContent = '';
+ 
+  if(order.length === 0){
+    if(errorEl) errorEl.textContent = 'Your cart is empty.';
+    return;
+  }
+ 
+  const emailInput = document.getElementById('customerEmail');
+  const customerEmail = emailInput ? emailInput.value.trim() : '';
+  if(!customerEmail || !customerEmail.includes('@')){
+    if(errorEl) errorEl.textContent = 'Enter a valid email first.';
+    if(emailInput) emailInput.focus();
+    return;
+  }
+ 
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  checkoutBtn.disabled = true;
+  const originalLabel = checkoutBtn.textContent;
+  checkoutBtn.textContent = 'Sending…';
+ 
+  try{
+    const res = await fetch(`${API_BASE_URL}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerEmail, items: order }),
+    });
+ 
+    if(!res.ok){
+      const body = await res.json().catch(()=>({}));
+      throw new Error(body.error || `Server responded ${res.status}`);
+    }
+ 
+    const data = await res.json();
+ 
+    order = [];
+    await saveCart();
+    renderDrawer();
+    closeDrawer();
+    if(emailInput) emailInput.value = '';
+    alert(`Order sent! Box ${data.boxNumber} has been assigned. You'll get an email with your pickup code once the supplier marks it ready.`);
+  }catch(err){
+    console.error('Failed to send order:', err);
+    if(errorEl) errorEl.textContent = 'Could not send the order — check your connection and try again.';
+  }finally{
+    checkoutBtn.disabled = false;
+    checkoutBtn.textContent = originalLabel;
+  }
 });
+function ensureCheckoutForm(){
+  if(document.getElementById('customerEmail')) return; // already added
+  const checkoutBtn = document.getElementById('checkoutBtn');
+  if(!checkoutBtn) return;
+  checkoutBtn.insertAdjacentHTML('beforebegin', `
+    <div class="checkout-email-row" style="margin:10px 0;">
+      <label for="customerEmail" style="display:block;font-size:12px;margin-bottom:4px;">
+        Your email (we'll send your pickup code here)
+      </label>
+      <input type="email" id="customerEmail" placeholder="you@example.com"
+             style="width:100%;padding:8px;box-sizing:border-box;">
+      <div id="checkoutError" style="color:#c0392b;font-size:12px;margin-top:4px;"></div>
+    </div>
+  `);
+}
 
 /* ================= INIT ================= */
 function initApp() {
+  
   renderNav();
   renderGrid();
   renderDrawer();
+  ensureCheckoutForm();
+  loadCart().then(renderDrawer);
 }
 
 loadCatalog();
