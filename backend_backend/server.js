@@ -8,6 +8,8 @@ const app = express();
 app.use(express.json());
 app.use(ordersRouter);
 
+app.get('/', (req, res) => res.send('Order system is running.'));
+
 startCronJobs();
 
 const PORT = process.env.PORT || 3000;

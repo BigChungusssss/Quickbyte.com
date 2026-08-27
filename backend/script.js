@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', applySignInState);
 
 // Paste the "Publish to web" CSV link from the client's Google Sheet here.
 const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRtBKzhJV6QX8i1cK_x6ltzZfo9J5wDxdiRCpmCk-AvsbG7EPAP1o8B8Y1JgE_6P8-Y_Knhtk1NZxYy/pub?gid=1974837864&single=true&output=csv";
-const API_BASE_URL = "http://localhost:3000"; 
+const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com"; 
 /* ================= STATE ================= */
 let CATALOG = {}; // Rebuilt from sheet rows: { category: { label, color, icon, items:[{name,type,variants:[...]}] } }
 let activeCat = "";
