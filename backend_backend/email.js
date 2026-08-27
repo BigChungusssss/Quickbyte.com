@@ -28,8 +28,7 @@ function itemsTableHTML(items) {
   const rows = items.map(it => `
     <tr>
       <td style="padding:4px 12px 4px 0;">${it.name}${it.variantLabel ? ` (${it.variantLabel})` : ''}</td>
-      <td style="padding:4px 12px;text-align:center;">${it.qty}</td>
-      <td style="padding:4px 0;text-align:right;">${it.price != null ? '$' + Number(it.price).toFixed(2) : ''}</td>
+      <td style="padding:4px 0;text-align:center;">${it.qty}</td>
     </tr>
   `).join('');
   return `<table style="border-collapse:collapse;">${rows}</table>`;
@@ -47,7 +46,6 @@ function sendSupplierOrderEmail(order, readyLink) {
         <li><strong>Submitted:</strong> ${new Date(order.submittedAt).toLocaleString()}</li>
       </ul>
       ${itemsTableHTML(order.items)}
-      <p><strong>Total: $${order.total.toFixed(2)}</strong></p>
       <p><a href="${readyLink}">Click here once the order is packed and ready for pickup.</a></p>
       <p style="color:#888;font-size:12px;">This link is single-use and unique to this order.</p>
     `,

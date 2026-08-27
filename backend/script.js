@@ -1,4 +1,3 @@
-
 if (!window.storage) {
   window.storage = {
     async get(key) {
@@ -53,7 +52,7 @@ const API_BASE_URL = "http://localhost:3000";
 /* ================= STATE ================= */
 let CATALOG = {}; // Rebuilt from sheet rows: { category: { label, color, icon, items:[{name,type,variants:[...]}] } }
 let activeCat = "";
-let order = []; // {key, name, variantLabel, price, qty}
+let order = []; // {key, name, variantLabel, qty}
 
 /* ================= AUTO ICON (no code changes needed for new categories) ================= */
 // Generates a simple colored circle with the category's initial letter.
@@ -79,7 +78,6 @@ function buildCatalogFromRows(rows) {
     const itemName = (row.item_name || "").trim();
     const itemType = (row.item_type || "").trim();
     const variantLabel = (row.variant_label || "").trim();
-    const price = parseFloat(row.price);
     const inStock = String(row.inStock).trim().toUpperCase() !== "FALSE";
     const bandsRaw = (row.bands || "").trim();
     const bands = bandsRaw ? bandsRaw.split(",").map(b => b.trim()).filter(Boolean) : null;
@@ -101,7 +99,6 @@ function buildCatalogFromRows(rows) {
 
     item.variants.push({
       label: variantLabel,
-      price: isNaN(price) ? null : price,
       inStock,
       ...(bands ? { bands } : {})
     });
@@ -185,14 +182,12 @@ function cardHTML(catKey, i, item){
         ${item.variants.map((v,vi)=>`<option value="${vi}" ${v.inStock == false ? 'disabled' : ''}>${v.label} ${v.inStock == false ? 'OutofStock' : ''}</option>`).join('')}
       </select>
       ${item.variants.some(v=>v.bands) ? `<div class="band-preview" id="bands-${id}">${bandPreviewHTML(first)}</div>` : ''}
-      <div class="spec-row"><span></span><span id="price-${id}">${first.price != null ? '$' + first.price.toFixed(2) : ''}</span></div>
       <div class="card-foot">
         <div class="qty">
           <button data-act="dec">−</button>
           <input type="text" value="1" id="qty-${id}" readonly>
           <button data-act="inc">+</button>
         </div>
-        <div class="price"><small>× qty</small></div>
       </div>
       <button class="add-btn" id="add-${id}">Add to Order</button>
     </div>
@@ -208,7 +203,6 @@ function bandPreviewHTML(variant){
 function wireCard(catKey, i, item){
   const id = `${catKey}-${i}`;
   const select = document.getElementById(`variant-${id}`);
-  const priceEl = document.getElementById(`price-${id}`);
   const qtyEl = document.getElementById(`qty-${id}`);
   const bandsEl = document.getElementById(`bands-${id}`);
   const addBtn = document.getElementById(`add-${id}`);
@@ -219,7 +213,6 @@ function wireCard(catKey, i, item){
   select.addEventListener('change', ()=>{
     const v = currentVariant();
     if(bandsEl) bandsEl.innerHTML = bandPreviewHTML(v);
-    if(priceEl) priceEl.textContent = v.price != null ? '$' + v.price.toFixed(2) : '';
   });
 
   card.querySelectorAll('.qty button').forEach(btn=>{
@@ -237,7 +230,7 @@ function wireCard(catKey, i, item){
     const existing = order.find(o=>o.key===key);
     if(existing){ existing.qty += qty; }
     else{
-      order.push({ key, name:item.name, variantLabel:v.label, price: v.price, qty });
+      order.push({ key, name:item.name, variantLabel:v.label, qty });
     }
     addBtn.textContent = "Added ✓";
     addBtn.classList.add('added');
