@@ -150,6 +150,33 @@
     border-color: var(--teal);
   }
 
+
+  #qr-wrap img {
+  margin: 16px 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  background: #fff;
+  
+  /* Responsive Changes */
+  width: 100%;           /* Fills up the available container space safely */
+  max-width: 200px;      /* Prevents the QR code from blowing up too large on desktop */
+  height: auto;          /* Maintains the perfect 1:1 square aspect ratio */
+  display: block;
+}
+
+.mobile-only-link {
+  display: none !important;
+}
+
+/* Show the link only on mobile viewports (screens under 480px) */
+@media (max-width: 480px) {
+  .mobile-only-link {
+    display: inline-block !important;
+  }
+}
+
+
     @media (max-width: 480px) {
     #card {
       padding: 32px 24px;

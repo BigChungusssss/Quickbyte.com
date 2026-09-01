@@ -48,16 +48,58 @@ async function routeAfterAuth() {
   const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
   const { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
   const verifiedTotp = (factorsData?.totp || []).find(f => f.status === 'verified');
-
-  if (!verifiedTotp) {
+   if (!verifiedTotp) {
     // First time this user has signed in — make them set up 2FA before they can do anything.
     const { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
     if (error) { msg.textContent = error.message; return; }
     pendingFactorId = data.id;
-    document.getElementById('qr-wrap').innerHTML = `<img src="${data.totp.qr_code}" alt="Scan with your authenticator app" />`;
+
+    const qrWrap = document.getElementById('qr-wrap');
+    qrWrap.innerHTML = ''; // Safely clear out any loading text
+    qrWrap.style.flexDirection = 'column'; // Stack elements vertically
+
+    // 1. Create and append the responsive QR Image
+    const qrImg = document.createElement('img');
+    qrImg.src = data.totp.qr_code;
+    qrImg.alt = "Scan with your authenticator app";
+    qrWrap.appendChild(qrImg);
+
+    // 2. Build the native mobile deep link string
+    const userEmail = encodeURIComponent(session.user.email || 'user');
+    const issuerName = encodeURIComponent('QuickByte');
+    const otpauthUrl = `otpauth://totp/${issuerName}:${userEmail}?secret=${data.totp.secret}&issuer=${issuerName}`;
+
+    // 3. Create and append the mobile-friendly clickable link button
+    const mobileLink = document.createElement('a');
+    mobileLink.href = otpauthUrl;
+    mobileLink.className = "mobile-only-link"; 
+    mobileLink.textContent = "📱 Open in Authenticator App";
+    mobileLink.style.cssText = `
+      display: inline-block;
+      margin-top: 12px;
+      font-family: var(--font-mono);
+      font-size: 14px;
+      color: var(--copper);
+      text-decoration: none;
+      font-weight: 500;
+      padding: 6px 12px;
+      border: 1px dashed var(--line);
+      border-radius: 4px;
+      background: var(--card);
+    `;
+    
+    // Optional hover effect via JS manipulation
+    mobileLink.onmouseover = () => mobileLink.style.color = 'var(--copper-dk)';
+    mobileLink.onmouseout = () => mobileLink.style.color = 'var(--copper)';
+
+    qrWrap.appendChild(mobileLink);
+
     showStep('enroll');
     return;
   }
+
+
+
 
   if (aalData.currentLevel !== 'aal2') {
     // Factor exists and is verified, but this session hasn't done the 2FA challenge yet.
