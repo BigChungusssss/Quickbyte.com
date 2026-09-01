@@ -1,173 +1,121 @@
-const cardInner = document.getElementById('cardInner');
-const heading = document.getElementById('heading');
-const hint = document.getElementById('hint');
-const toastEl = document.getElementById('toast');
-const clockEl = document.getElementById('clock');
+// signin.js
+// Set this to wherever your backend actually runs (same as API_BASE_URL in script.js)
+const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
+const HOME_PAGE = "../index.html";
 
-// Add this snippet at the top of your JavaScript file
-if (!window.storage) {
-  window.storage = {
-    async get(key) {
-      const val = localStorage.getItem(key);
-      return val ? { value: val } : null;
-    },
-    async set(key, value) {
-      localStorage.setItem(key, value);
-    },
-    async delete(key) {
-      localStorage.removeItem(key);
-    }
-  };
+const stepLogin = document.getElementById('step-login');
+const stepEnroll = document.getElementById('step-enroll');
+const stepChallenge = document.getElementById('step-challenge');
+const msg = document.getElementById('msg');
+
+let pendingFactorId = null;
+let pendingChallengeId = null;
+
+function showStep(step) {
+  stepLogin.style.display = step === 'login' ? 'block' : 'none';
+  stepEnroll.style.display = step === 'enroll' ? 'block' : 'none';
+  stepChallenge.style.display = step === 'challenge' ? 'block' : 'none';
 }
 
-const DEGREES = ["BSc","BA","BCom","BEng","LLB","MSc","MA","MBA","PhD","Other"];
-
-function tick(){
-  clockEl.textContent = new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
-}
-tick(); setInterval(tick, 30000);
-
-function toast(msg){
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  setTimeout(()=> toastEl.classList.remove('show'), 2200);
-}
-
-async function getActive(){
-  try{
-    const res = await window.storage.get('active-session', false);
-    return res ? JSON.parse(res.value) : null;
-  }catch(e){ return null; }
-}
-async function setActive(data){
-  await window.storage.set('active-session', JSON.stringify(data), false);
-}
-async function clearActive(){
-  try{ await window.storage.delete('active-session', false); }catch(e){}
-}
-async function saveStudentRecord(data){
-  try{
-    await window.storage.set('student:' + data.studentNumber, JSON.stringify(data), false);
-  }catch(e){ console.error('save failed', e); }
-}
-async function deleteStudentRecord(number){
-  try{ await window.storage.delete('student:' + number, false); }catch(e){}
+async function checkAllowedOnBackend() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) {
+    console.log("No local Supabase auth session found.");
+    return false;
+  }
+  
+  try {
+    const res = await fetch(`${API_BASE_URL}/auth/check-allowed`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+    
+    const json = await res.json();
+    console.log("Server JSON Payload Received:", json); // <-- Look for this in the F12 Console
+    
+    return json.allowed === true;
+  } catch (error) {
+    console.error("Network Fetch Exception Error:", error);
+    return false;
+  }
 }
 
-function renderForm(prefill){
-  prefill = prefill || {};
-  heading.textContent = prefill.studentNumber ? 'Edit your details' : 'Course sign-in';
-  hint.textContent = 'Your details are saved so you can sign back in later. Nothing here decides where you land yet — that comes next.';
 
-  cardInner.innerHTML = `
-    <label for="courseCode">Course code</label>
-    <input id="courseCode" placeholder="e.g. COMS3011" autocomplete="off" value="${esc(prefill.courseCode||'')}">
 
-    <label for="name">Full name</label>
-    <input id="name" placeholder="e.g. Naledi Khumalo" autocomplete="off" value="${esc(prefill.name||'')}">
+async function routeAfterAuth() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) { showStep('login'); return; }
 
-    <div class="row2">
-      <div>
-        <label for="studentNumber">Student number</label>
-        <input id="studentNumber" placeholder="e.g. 2145678" autocomplete="off" value="${esc(prefill.studentNumber||'')}">
-      </div>
-      <div>
-        <label for="degree">Degree</label>
-        <select id="degree">
-          ${DEGREES.map(d => `<option value="${d}" ${prefill.degree===d?'selected':''}>${d}</option>`).join('')}
-        </select>
-      </div>
-    </div>
+  // Which "assurance level" is this session at right now vs. the highest available?
+  const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+  const { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
+  const verifiedTotp = (factorsData?.totp || []).find(f => f.status === 'verified');
 
-    <label for="groupNumber">Group number</label>
-    <input id="groupNumber" placeholder="e.g. Group 4" autocomplete="off" value="${esc(prefill.groupNumber||'')}">
-
-    <div class="err" id="err"></div>
-    <button class="btn btn-primary" id="submitBtn">${prefill.studentNumber ? 'Save changes' : 'Sign in'}</button>
-  `;
-
-  document.getElementById('submitBtn').addEventListener('click', onSubmit);
-}
-
-function esc(s){
-  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-async function onSubmit(){
-  const courseCode = document.getElementById('courseCode').value.trim();
-  const name = document.getElementById('name').value.trim();
-  const studentNumber = document.getElementById('studentNumber').value.trim();
-  const degree = document.getElementById('degree').value;
-    const groupNumber = document.getElementById('groupNumber').value.trim();
-  const errEl = document.getElementById('err');
-
-  if(!courseCode || !name || !studentNumber){
-    errEl.textContent = 'Fill in course code, name, and student number';
+  if (!verifiedTotp) {
+    // First time this user has signed in — make them set up 2FA before they can do anything.
+    const { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+    if (error) { msg.textContent = error.message; return; }
+    pendingFactorId = data.id;
+    document.getElementById('qr-wrap').innerHTML = `<img src="${data.totp.qr_code}" alt="Scan with your authenticator app" />`;
+    showStep('enroll');
     return;
   }
-  errEl.textContent = '';
 
-  const btn = document.getElementById('submitBtn');
-  btn.disabled = true;
-  btn.textContent = 'Saving…';
-
-  const record = { courseCode, name, studentNumber, groupNumber, degree, signedInAt: new Date().toISOString() };
-
-  try{
-    await saveStudentRecord(record);
-    await setActive(record);
-    toast('Signed in');
-    renderSignedIn(record);
-  }catch(e){
-    errEl.textContent = 'Could not save — try again.';
-    btn.disabled = false;
-    btn.textContent = 'Sign in';
+  if (aalData.currentLevel !== 'aal2') {
+    // Factor exists and is verified, but this session hasn't done the 2FA challenge yet.
+    const { data, error } = await supabaseClient.auth.mfa.challenge({ factorId: verifiedTotp.id });
+    if (error) { msg.textContent = error.message; return; }
+    pendingFactorId = verifiedTotp.id;
+    pendingChallengeId = data.id;
+    showStep('challenge');
+    return;
   }
+
+  // Fully authenticated (Google + 2FA). Last check: are they actually on the allowlist?
+  const allowed = await checkAllowedOnBackend();
+  if (!allowed) {
+    msg.textContent = "This account isn't approved for access. Contact the site admin.";
+    await supabaseClient.auth.signOut();
+    showStep('login');
+    return;
+  }
+
+  window.location.href = HOME_PAGE;
 }
 
-function renderSignedIn(data){
-  heading.textContent = 'Signed in';
-  hint.textContent = 'Sign out keeps your details saved for next time. Delete removes them completely.';
-
-  cardInner.innerHTML = `
-    <span class="stamp"><span class="dot"></span>Enrolled</span>
-    <div style="margin-top:18px;">
-      <div class="field"><span class="k">Course code</span><span class="v">${esc(data.courseCode)}</span></div>
-      <div class="field"><span class="k">Name</span><span class="v">${esc(data.name)}</span></div>
-      <div class="field"><span class="k">Student number</span><span class="v">${esc(data.studentNumber)}</span></div>
-      <div class="field"><span class="k">Degree</span><span class="v">${esc(data.degree)}</span></div>
-      </div>
-    <div class="actions">
-      <button class="btn btn-ghost" id="btnSignOut">Sign out</button>
-      <button class="btn btn-ghost" id="btnReset">Reset</button>
-      <button class="btn btn-danger" id="btnDelete">Delete</button>
-    </div>
-  `;
-
-  document.getElementById('btnSignOut').addEventListener('click', async ()=>{
-    await clearActive();
-    toast('Signed out — your details are still saved');
-    renderForm();
+document.getElementById('googleBtn').addEventListener('click', async () => {
+  msg.textContent = '';
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href },
   });
+  if (error) msg.textContent = error.message;
+});
 
-  document.getElementById('btnReset').addEventListener('click', ()=>{
-    renderForm(data);
+document.getElementById('enrollVerifyBtn').addEventListener('click', async () => {
+  msg.textContent = '';
+  const code = document.getElementById('enrollCode').value.trim();
+  const { data: challenge, error: challengeErr } = await supabaseClient.auth.mfa.challenge({ factorId: pendingFactorId });
+  if (challengeErr) { msg.textContent = challengeErr.message; return; }
+  const { error } = await supabaseClient.auth.mfa.verify({
+    factorId: pendingFactorId,
+    challengeId: challenge.id,
+    code,
   });
+  if (error) { msg.textContent = 'Incorrect code — try again.'; return; }
+  await routeAfterAuth();
+});
 
-  document.getElementById('btnDelete').addEventListener('click', async ()=>{
-    if(!confirm('Delete your saved details? This cannot be undone.')) return;
-    await deleteStudentRecord(data.studentNumber);
-    await clearActive();
-    toast('Details deleted');
-    renderForm();
+document.getElementById('challengeVerifyBtn').addEventListener('click', async () => {
+  msg.textContent = '';
+  const code = document.getElementById('challengeCode').value.trim();
+  const { error } = await supabaseClient.auth.mfa.verify({
+    factorId: pendingFactorId,
+    challengeId: pendingChallengeId,
+    code,
   });
-}
+  if (error) { msg.textContent = 'Incorrect code — try again.'; return; }
+  await routeAfterAuth();
+});
 
-(async function init(){
-  const active = await getActive();
-  if(active){
-    renderSignedIn(active);
-  }else{
-    renderForm();
-  }
-})();
+// Runs on initial load AND right after Supabase redirects back from Google.
+routeAfterAuth();

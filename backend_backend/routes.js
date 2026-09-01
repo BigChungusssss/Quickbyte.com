@@ -4,6 +4,7 @@ const cors = require('cors');
 const crypto = require('crypto');
 const { createOrder, getOrder, updateOrder, assignBox, releaseBox } = require('./store');
 const { generateUniqueCode } = require('./codeGen');
+const { requireAuth, authRateLimiter, logSecurityEvent } = require('./auth-and-security');
 const {
   sendSupplierOrderEmail,
   sendCustomerPickupCode,
@@ -18,15 +19,16 @@ const SUPPLIER_EMAIL = process.env.SUPPLIER_EMAIL; // one fixed address for ever
 const PICKUP_WINDOW_HOURS = 1; // how long a "ready" order sits before it's removed
 
 // POST /orders
-// Body: { customerEmail, items: [{ name, variantLabel, price, qty }, ...] }
-// Called by the cart's "Send to supplier" button.
-router.post('/orders', async (req, res) => {
-  const { customerEmail, items } = req.body;
+// Body: { items: [{ name, variantLabel, price, qty }, ...] }
+// Called by the cart's "Send to supplier" button. Requires a signed-in, 2FA'd
+// class leader — customerEmail now comes from their verified session, not the
+// request body, so an order can't be placed under a spoofed email.
+router.post('/orders', authRateLimiter, requireAuth, async (req, res) => {
+  const { items } = req.body;
+  const customerEmail = req.user.email;
 
-  if (!customerEmail || !customerEmail.includes('@')) {
-    return res.status(400).json({ error: 'A valid customerEmail is required' });
-  }
   if (!Array.isArray(items) || items.length === 0) {
+    await logSecurityEvent({ req, type: 'bad_input', detail: 'Empty or invalid items array', email: req.user.email });
     return res.status(400).json({ error: 'items must be a non-empty array' });
   }
   if (!SUPPLIER_EMAIL) {
@@ -45,6 +47,10 @@ router.post('/orders', async (req, res) => {
     boxNumber,
     supplierEmail: SUPPLIER_EMAIL,
     customerEmail,
+    leaderName: req.user.leaderName,
+    companyName: req.user.companyName,
+    studentNumber: req.user.studentNumber,
+    groupNumber: req.user.groupNumber,
     items,
     total,
     submittedAt: Date.now(),
@@ -72,12 +78,16 @@ router.post('/orders', async (req, res) => {
 });
 
 // GET /orders/:id/ready?token=...
-// This is the link the supplier clicks from their email. No login needed —
-// the token in the link is what proves it's really them.
+// This is the link the supplier clicks from their email. Intentionally NOT behind
+// requireAuth — the supplier isn't a class leader and has no account. The random
+// readyToken in the link is what proves it's really them; do not add login here.
 router.get('/orders/:id/ready', async (req, res) => {
   const order = getOrder(req.params.id);
   if (!order) return res.status(404).send('Order not found.');
-  if (order.readyToken !== req.query.token) return res.status(403).send('Invalid or expired link.');
+  if (order.readyToken !== req.query.token) {
+    await logSecurityEvent({ req, type: 'bad_input', detail: 'Invalid or reused ready-link token' });
+    return res.status(403).send('Invalid or expired link.');
+  }
   if (order.status !== 'pending') return res.send('This order was already marked ready.');
 
   const code = generateUniqueCode();
@@ -106,7 +116,9 @@ router.get('/orders/:id/ready', async (req, res) => {
 
 // POST /orders/:id/picked-up
 // Call this when the customer actually opens the box (from your locker
-// hardware later, or manually by staff for now).
+// hardware later, or manually by staff for now). Not behind requireAuth yet
+// since it's staff/hardware-triggered, not a class leader action — worth
+// revisiting once you know what's calling this in production.
 router.post('/orders/:id/picked-up', (req, res) => {
   const order = getOrder(req.params.id);
   if (!order) return res.status(404).json({ error: 'Order not found' });
