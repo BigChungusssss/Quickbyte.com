@@ -19,10 +19,7 @@ function showStep(step) {
 
 async function checkAllowedOnBackend() {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) {
-    console.log("No local Supabase auth session found.");
-    return false;
-  }
+  if (!session) return false;
   
   try {
     const res = await fetch(`${API_BASE_URL}/auth/check-allowed`, {
@@ -30,14 +27,16 @@ async function checkAllowedOnBackend() {
     });
     
     const json = await res.json();
-    console.log("Server JSON Payload Received:", json); // <-- Look for this in the F12 Console
+    console.log("Server JSON Payload Received:", json);
     
-    return json.allowed === true;
+    // Accept either json.ok or json.allowed as valid approval indicators
+    return json.ok === true || json.allowed === true;
   } catch (error) {
-    console.error("Network Fetch Exception Error:", error);
+    console.error("Backend authorization check failed:", error);
     return false;
   }
 }
+
 
 
 
