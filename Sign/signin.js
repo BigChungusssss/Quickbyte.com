@@ -89,7 +89,7 @@ document.getElementById('googleBtn').addEventListener('click', async () => {
   });
   if (error) msg.textContent = error.message;
 });
-
+//
 document.getElementById('enrollVerifyBtn').addEventListener('click', async () => {
   msg.textContent = '';
   const code = document.getElementById('enrollCode').value.trim();
