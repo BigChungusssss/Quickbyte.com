@@ -107,14 +107,33 @@ async function loadCatalog() {
 
 
 async function saveCart(){
-  try{ await window.storage.set('cart', JSON.stringify(order), false); }catch(e){}
+  try { 
+    // Always stringify the exact current state of the order array
+    await window.storage.set('cart', JSON.stringify(order)); 
+  } catch(e) {
+    console.error("Failed to save cart state:", e);
+  }
 }
 
 async function loadCart(){
-  try{
-    const res = await window.storage.get('cart', false);
-    order = res ? JSON.parse(res.value) : [];
-  }catch(e){ order = []; }
+  try {
+    const res = await window.storage.get('cart');
+    if (res && res.value) {
+      const parsedData = JSON.parse(res.value);
+      // Ensure we actually got an array back, even if it is empty []
+      order = Array.isArray(parsedData) ? parsedData : [];
+    } else {
+      order = [];
+    }
+  } catch(e) { 
+    console.error("Failed to load cart state, resetting to empty:", e);
+    order = []; 
+  }
+  
+  // Force the UI elements to redraw immediately using the loaded state
+  if (typeof renderDrawer === 'function') {
+    renderDrawer();
+  }
 }
 /* ================= RENDER: CATEGORY NAV ================= */
 const catNav = document.getElementById('catNav');
