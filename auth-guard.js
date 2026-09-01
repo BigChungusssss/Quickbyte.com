@@ -4,7 +4,7 @@
 // <script src="supabaseClient.js"></script>
 // <script src="auth-guard.js"></script>
 
-const SIGNIN_PAGE = 'Frontend/Sign/signin.html';
+const SIGNIN_PAGE = 'Sign/signin.html';
 const AUTH_API_BASE_URL = 'https://quickbyte-com-food-ordering-website.onrender.com';
 
 // Returns the current access token if the session is fully authenticated (Google + 2FA),
