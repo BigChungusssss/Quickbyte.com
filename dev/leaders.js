@@ -1,4 +1,4 @@
-    const API_BASE_URL = 'https://quickbyte-com-food-ordering-website.onrender.com';
+    const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
     let accessToken = null;
 
     function authHeaders() {

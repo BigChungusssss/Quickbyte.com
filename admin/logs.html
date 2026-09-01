@@ -5,12 +5,7 @@
   <title>Security log</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabaseClient.js"></script>
-  <style>
-    body { font-family: sans-serif; max-width: 900px; margin: 30px auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-    th { background: #f5f5f5; }
-    #msg { color: #c0392b; }
+  <style src = "logs.css">
   </style>
 </head>
 <body>
@@ -23,35 +18,8 @@
     <tbody id="rows"></tbody>
   </table>
 
-  <script>
-    const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
+  <script src = "logs.js">
 
-    async function load() {
-      const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) { window.location.href = '../Sign/signin.html'; return; }
-
-      const res = await fetch(`${API_BASE_URL}/admin/security-logs`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-
-      if (res.status === 401) { window.location.href = '../Frontend/Sign/signin.html'; return; }
-      if (res.status === 403) { document.getElementById('msg').textContent = "You're signed in but not an admin."; return; }
-      if (!res.ok) { document.getElementById('msg').textContent = 'Failed to load logs.'; return; }
-
-      const { logs } = await res.json();
-      document.getElementById('rows').innerHTML = logs.map(l => `
-        <tr>
-          <td>${new Date(l.created_at).toLocaleString()}</td>
-          <td>${l.type}</td>
-          <td>${l.detail || ''}</td>
-          <td>${l.email || ''}</td>
-          <td>${l.ip || ''}</td>
-          <td>${l.path || ''}</td>
-        </tr>
-      `).join('');
-    }
-
-    load();
   </script>
 </body>
 </html>
