@@ -42,6 +42,22 @@ async function applySignInUI(accessToken) {
         greetingEl.textContent = '';
       }
     }
+
+    // Quiet check: only devs get this link injected — everyone else, this
+    // silently does nothing. Not a new access point, just a shortcut for you.
+    try {
+      const devCheck = await fetch(`${AUTH_API_BASE_URL}/dev/check`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (devCheck.ok && !document.getElementById('devShortcutLink')) {
+        const link = document.createElement('a');
+        link.id = 'devShortcutLink';
+        link.href = 'dev/leaders.html';
+        link.textContent = 'dev';
+        link.style.cssText = 'position:fixed;bottom:8px;left:8px;font-family:monospace;font-size:11px;color:#999;text-decoration:none;z-index:999;opacity:0.6;';
+        document.body.appendChild(link);
+      }
+    } catch (e) { /* not a dev, or offline — either way, show nothing */ }
   } else {
     signInBtn.textContent = 'Sign IN';
     signInBtn.onclick = () => { window.location.href = SIGNIN_PAGE; };

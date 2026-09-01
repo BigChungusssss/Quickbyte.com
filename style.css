@@ -419,6 +419,14 @@
       align-items:center;
       padding:12px 14px;
     }
+    .card-title{
+     height:auto;
+     min-height:36px;   /* room for two lines at this font-size */
+     line-height:1.2;
+    }
+    .card-type{
+     margin-top:2px;    /* was -6px — that negative value only worked for single-line titles */
+    }
     .brand{ flex:1; min-width:0; order:0; }
     .brand > div{
       min-width:0;
