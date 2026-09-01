@@ -22,6 +22,21 @@ if (!window.storage) {
   };
 }
 
+function showModal(title, message){
+  const scrim = document.getElementById('modalScrim');
+  const box = document.getElementById('orderModal');
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalMessage').textContent = message;
+  scrim.classList.add('show');
+  box.classList.add('show');
+}
+function hideModal(){
+  document.getElementById('modalScrim').classList.remove('show');
+  document.getElementById('orderModal').classList.remove('show');
+}
+document.getElementById('modalOkBtn').addEventListener('click', hideModal);
+document.getElementById('modalScrim').addEventListener('click', hideModal);
+
 
 document.addEventListener('DOMContentLoaded', () => {
   const menuToggle = document.getElementById('menuToggle');
@@ -346,7 +361,7 @@ document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
     renderDrawer();
     closeDrawer();
     if(emailInput) emailInput.value = '';
-    alert(`Order sent! Box ${data.boxNumber} has been assigned. You'll get an email with your pickup code once the supplier marks it ready.`);
+    showModal('Order sent!', `Box ${data.boxNumber} has been assigned. You'll get an email with your pickup code once the supplier marks it ready.`);
   }catch(err){
     console.error('Failed to send order:', err);
     if(errorEl) errorEl.textContent = 'Could not send the order — check your connection and try again.';
