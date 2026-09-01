@@ -48,59 +48,84 @@ async function routeAfterAuth() {
   // Which "assurance level" is this session at right now vs. the highest available?
   const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
   const { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
-  const verifiedTotp = (factorsData?.totp || []).find(f => f.status === 'verified');
-   if (!verifiedTotp) {
-    // First time this user has signed in — make them set up 2FA before they can do anything.
-    const { data, error } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
-    if (error) { msg.textContent = error.message; return; }
-    pendingFactorId = data.id;
+  
+  const allTotpFactors = factorsData?.totp || [];
+  const verifiedTotp = allTotpFactors.find(f => f.status === 'verified');
+  const unverifiedTotp = allTotpFactors.find(f => f.status === 'unverified');
 
-    const qrWrap = document.getElementById('qr-wrap');
-    qrWrap.innerHTML = ''; // Safely clear out any loading text
-    qrWrap.style.flexDirection = 'column'; // Stack elements vertically
+  // If no verified factor exists, we must handle enrollment or resume an unverified one
+  if (!verifiedTotp) {
+    let enrollmentData;
 
-    // 1. Create and append the responsive QR Image
-    const qrImg = document.createElement('img');
-    qrImg.src = data.totp.qr_code;
-    qrImg.alt = "Scan with your authenticator app";
-    qrWrap.appendChild(qrImg);
+    if (unverifiedTotp) {
+      // An unverified factor exists. Challenge it to get a validation session instead of creating a conflict.
+      const { data: challengeData, error: challengeErr } = await supabaseClient.auth.mfa.challenge({ factorId: unverifiedTotp.id });
+      if (challengeErr) { msg.textContent = challengeErr.message; return; }
+      
+      pendingFactorId = unverifiedTotp.id;
+      pendingChallengeId = challengeData.id;
+      
+      // Attempt to re-enroll to retrieve a fresh QR code payload for the user interface
+      const { data: reEnrollData, error: reEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+      if (!reEnrollErr) {
+        pendingFactorId = reEnrollData.id;
+        enrollmentData = reEnrollData.totp;
+      }
+    } else {
+      // First time this user has signed in — create a brand new enrollment factor.
+      const { data: newEnrollData, error: newEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+      if (newEnrollErr) { msg.textContent = newEnrollErr.message; return; }
+      
+      pendingFactorId = newEnrollData.id;
+      enrollmentData = newEnrollData.totp;
+    }
 
-    // 2. Build the native mobile deep link string
-    const userEmail = encodeURIComponent(session.user.email || 'user');
-    const issuerName = encodeURIComponent('QuickByte');
-    const otpauthUrl = `otpauth://totp/${issuerName}:${userEmail}?secret=${data.totp.secret}&issuer=${issuerName}`;
+    // Only render the UI components if we have valid QR/Secret registration data
+    if (enrollmentData) {
+      const qrWrap = document.getElementById('qr-wrap');
+      qrWrap.innerHTML = ''; // Safely clear out any loading text
+      qrWrap.style.flexDirection = 'column'; // Stack elements vertically
 
-    // 3. Create and append the mobile-friendly clickable link button
-    const mobileLink = document.createElement('a');
-    mobileLink.href = otpauthUrl;
-    mobileLink.className = "mobile-only-link"; 
-    mobileLink.textContent = "📱 Open in Authenticator App";
-    mobileLink.style.cssText = `
-      display: inline-block;
-      margin-top: 12px;
-      font-family: var(--font-mono);
-      font-size: 14px;
-      color: var(--copper);
-      text-decoration: none;
-      font-weight: 500;
-      padding: 6px 12px;
-      border: 1px dashed var(--line);
-      border-radius: 4px;
-      background: var(--card);
-    `;
-    
-    // Optional hover effect via JS manipulation
-    mobileLink.onmouseover = () => mobileLink.style.color = 'var(--copper-dk)';
-    mobileLink.onmouseout = () => mobileLink.style.color = 'var(--copper)';
+      // 1. Create and append the responsive QR Image
+      const qrImg = document.createElement('img');
+      qrImg.src = enrollmentData.qr_code;
+      qrImg.alt = "Scan with your authenticator app";
+      qrWrap.appendChild(qrImg);
 
-    qrWrap.appendChild(mobileLink);
+      // 2. Build the native mobile deep link string
+      const userEmail = encodeURIComponent(session.user.email || 'user');
+      const issuerName = encodeURIComponent('QuickByte');
+      const otpauthUrl = `otpauth://totp/${issuerName}:${userEmail}?secret=${enrollmentData.secret}&issuer=${issuerName}`;
+
+      // 3. Create and append the mobile-friendly clickable link button
+      const mobileLink = document.createElement('a');
+      mobileLink.href = otpauthUrl;
+      mobileLink.className = "mobile-only-link"; 
+      mobileLink.textContent = "📱 Open in Authenticator App";
+      mobileLink.style.cssText = `
+        display: inline-block;
+        margin-top: 12px;
+        font-family: var(--font-mono);
+        font-size: 14px;
+        color: var(--copper);
+        text-decoration: none;
+        font-weight: 500;
+        padding: 6px 12px;
+        border: 1px dashed var(--line);
+        border-radius: 4px;
+        background: var(--card);
+      `;
+      
+      // Optional hover effect via JS manipulation
+      mobileLink.onmouseover = () => mobileLink.style.color = 'var(--copper-dk)';
+      mobileLink.onmouseout = () => mobileLink.style.color = 'var(--copper)';
+
+      qrWrap.appendChild(mobileLink);
+    }
 
     showStep('enroll');
     return;
   }
-
-
-
 
   if (aalData.currentLevel !== 'aal2') {
     // Factor exists and is verified, but this session hasn't done the 2FA challenge yet.
@@ -123,6 +148,7 @@ async function routeAfterAuth() {
 
   window.location.href = HOME_PAGE;
 }
+
 
 document.getElementById('googleBtn').addEventListener('click', async () => {
   msg.textContent = '';
