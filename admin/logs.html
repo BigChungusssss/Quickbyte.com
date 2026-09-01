@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Security log</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,15 +11,15 @@
 <body>
   <h2>Security log</h2>
   <p id="msg"></p>
-  <table>
-    <thead>
-      <tr><th>Time</th><th>Type</th><th>Detail</th><th>Email</th><th>IP</th><th>Path</th></tr>
-    </thead>
-    <tbody id="rows"></tbody>
-  </table>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Type</th><th>Detail</th><th>Email</th><th>IP</th><th>Path</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
 
-  <script src = "logs.js">
-
-  </script>
+  <script src="logs.js"></script>
 </body>
 </html>

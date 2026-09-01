@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Class leaders</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabaseClient.js"></script>
   <link rel="stylesheet" href="leaders.css">
-
 </head>
 <body>
   <h2>Class leaders</h2>
@@ -21,14 +19,12 @@
     <input id="newStudentNumber" placeholder="Student number" required />
     <input id="newGroupNumber" placeholder="Group number" required />
     <input id="newEmails" placeholder="Emails, comma-separated (e.g. jane@gmail.com, jane@wits.ac.za)" required />
-    <label><input type="checkbox" id="newIsAdmin" /> Make this person an admin too</label>
+    <label class="admin-check"><input type="checkbox" id="newIsAdmin" /> Make this person an admin too</label>
     <button type="submit">Add leader</button>
   </form>
 
   <div id="leaders"></div>
 
-  <script src = "leaders.js">
-
-  </script>
+  <script src="leaders.js"></script>
 </body>
 </html>
