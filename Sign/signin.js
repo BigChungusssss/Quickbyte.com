@@ -1,7 +1,7 @@
 // signin.js
 // Set this to wherever your backend actually runs (same as API_BASE_URL in script.js)
 const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
-const HOME_PAGE = "../../index.html";
+const HOME_PAGE = "../index.html";
 
 
 const stepLogin = document.getElementById('step-login');
