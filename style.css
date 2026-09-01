@@ -457,3 +457,46 @@
       padding:10px 4px;
     }
   }
+
+    @media (max-width:760px){
+    .site-inner{
+      flex-wrap:nowrap;
+      justify-content:space-between;
+      padding:12px 14px;
+    }
+    .brand{ flex:1; min-width:0; }
+    .brand-name{ font-size:14px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .brand-sub{ font-size:9px; }
+    .logo-icon{ font-size:28px; width:22px; }
+
+    .nav-actions{
+      order:0;
+      width:auto;
+      flex:none;
+      gap:6px;
+    }
+    .cart-btn, .sign-In{
+      padding:7px 9px;
+      font-size:11px;
+      white-space:nowrap;
+      gap:5px;
+    }
+    .cart-count{ min-width:16px; height:16px; font-size:9.5px; }
+
+    .menu-toggle{ order:1; flex:none; margin-left:4px; }
+
+    .hero h1{ font-size:20px; line-height:1.2; margin-bottom:10px; }
+    .hero p{ font-size:13px; }
+    .hero{ padding:24px 16px 14px; gap:16px; }
+
+    .greeting{ font-size:13px; padding:10px 16px 0; }
+
+    nav.cats{
+      padding:0 16px 8px;
+      scroll-snap-type:x proximity;
+    }
+    .cat-tab{
+      scroll-snap-align:start;
+      font-size:11.5px;
+    }
+  }
