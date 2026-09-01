@@ -7,7 +7,7 @@ function authHeaders() {
 
 async function loadLeaders() {
   const res = await fetch(`${API_BASE_URL}/dev/leaders`, { headers: authHeaders() });
-  if (res.status === 401) { window.location.href = '../Frontend/Sign/signin.html'; return; }
+  if (res.status === 401) { window.location.href = '../Sign/signin.html'; return; }
   if (res.status === 403) { document.getElementById('msg').textContent = "You're signed in but not an admin."; return; }
   const { leaders } = await res.json();
 
@@ -103,7 +103,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) { window.location.href = '../Frontend/Sign/signin.html'; return; }
+  if (!session) { window.location.href = '../Sign/signin.html'; return; }
   accessToken = session.access_token;
 
   const check = await fetch(`${API_BASE_URL}/dev/check`, { headers: authHeaders() });
