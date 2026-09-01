@@ -245,10 +245,11 @@ function renderDrawer(){
       </div>
     </div>
   `).join('');
-  drawerItems.querySelectorAll('.di-remove').forEach(btn=>{
+drawerItems.querySelectorAll('.di-remove').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       order = order.filter(o=>o.key!==btn.dataset.key);
       renderDrawer();
+      saveCart();   // ← added this line
     });
   });
   const total = order.reduce((s,o)=>s+o.qty,0);
