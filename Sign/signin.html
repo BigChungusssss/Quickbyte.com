@@ -2,32 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Sign in</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabaseClient.js"></script>
   <link rel="stylesheet" href="signin.css">
 </head>
 <body>
-  <h2>Sign in</h2>
+  <div id="card">
+    <h2>Sign in</h2>
 
-  <div id="step-login">
-    <button id="googleBtn">Sign in with Google</button>
+    <div id="step-login">
+      <button id="googleBtn">Sign in with Google</button>
+    </div>
+
+    <div id="step-enroll" style="display:none">
+      <p>Set up two-factor authentication (one time only).</p>
+      <div id="qr-wrap"></div>
+      <input id="enrollCode" placeholder="6-digit code from your authenticator app" />
+      <button id="enrollVerifyBtn">Verify & finish setup</button>
+    </div>
+
+    <div id="step-challenge" style="display:none">
+      <p>Enter your 2FA code.</p>
+      <input id="challengeCode" placeholder="6-digit code" />
+      <button id="challengeVerifyBtn">Verify</button>
+    </div>
+
+    <p id="msg"></p>
   </div>
-
-  <div id="step-enroll" style="display:none">
-    <p>Set up two-factor authentication (one time only).</p>
-    <div id="qr-wrap"></div>
-    <input id="enrollCode" placeholder="6-digit code from your authenticator app" />
-    <button id="enrollVerifyBtn">Verify & finish setup</button>
-  </div>
-
-  <div id="step-challenge" style="display:none">
-    <p>Enter your 2FA code.</p>
-    <input id="challengeCode" placeholder="6-digit code" />
-    <button id="challengeVerifyBtn">Verify</button>
-  </div>
-
-  <p id="msg"></p>
 
   <script src="signin.js"></script>
 </body>
