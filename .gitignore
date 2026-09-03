@@ -68,3 +68,31 @@ vcpkg_installed/
 # test output & cache
 Testing/
 .cache/
+
+# Node.js Dependencies & Packages
+node_modules/
+package-lock.json
+
+# Environment & Secret Files
+.env
+.env.local
+.env.*.local
+*.pem
+
+# Uploads & Temporary Parsing Buffers
+uploads/
+tmp/
+*.xlsx
+*.csv
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor & OS Metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
