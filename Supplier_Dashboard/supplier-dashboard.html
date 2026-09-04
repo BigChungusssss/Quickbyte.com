@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Supplier Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/supabaseClient.js"></script>
+</head>
+<body style="font-family:sans-serif;max-width:900px;margin:30px auto;">
+  <h2>Supplier Dashboard</h2>
+  <div id="orders"></div>
+
+  <script>
+    const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
+    let accessToken = null;
+
+    async function fetchOrders() {
+      const res = await fetch(`${API_BASE_URL}/supplier/orders`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return;
+      const { orders } = await res.json();
+      renderOrders(orders);
+    }
+
+    function renderOrders(orders) {
+      document.getElementById('orders').innerHTML = orders.map(o => `
+        <div style="border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:10px;">
+          <strong>Order #${o.order_number}</strong> — ${o.status}
+          ${o.box_number ? ` — Box ${o.box_number}` : ''}
+          <div style="font-size:13px;color:#666;">${o.profiles?.full_name || ''} (${o.profiles?.email || ''})</div>
+          ${o.order_items.map(it => `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;">
+              <span>${it.category} — ${it.item_name} x${it.quantity}</span>
+              <button data-item="${it.id}" data-ready="${!it.is_ready}">
+                ${it.is_ready ? 'Ready ✓' : 'Mark ready'}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+
+      document.querySelectorAll('button[data-item]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await fetch(`${API_BASE_URL}/supplier/order-items/${btn.dataset.item}/ready`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ready: btn.dataset.ready === 'true' }),
+          });
+          fetchOrders();
+        });
+      });
+    }
+
+    (async () => {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) { window.location.href = '../Sign/signin.html'; return; }
+      accessToken = session.access_token;
+
+      await fetchOrders();
+
+      // Realtime: refetch whenever orders or order_items change anywhere.
+      // Simple approach for MVP — swap for targeted cache updates later if
+      // the order volume grows large enough that a full refetch feels slow.
+      supabaseClient
+        .channel('supplier-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fetchOrders)
+        .subscribe();
+    })();
+  </script>
+</body>
+</html>

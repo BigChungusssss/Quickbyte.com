@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Upload your order</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="/supabaseClient.js"></script>
+</head>
+<body style="font-family:sans-serif;max-width:420px;margin:60px auto;text-align:center;">
+  <h2>Upload your order</h2>
+  <input type="file" id="fileInput" accept=".xlsx,.xls" />
+  <button id="uploadBtn">Upload</button>
+  <p id="status"></p>
+
+  <script>
+    const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
+    const statusEl = document.getElementById('status');
+
+    async function pollStatus(jobId, token) {
+      const res = await fetch(`${API_BASE_URL}/uploads/${jobId}/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const job = await res.json();
+
+      if (job.status === 'succeeded') {
+        statusEl.textContent = 'Order received!';
+      } else if (job.status === 'failed') {
+        statusEl.textContent = `Failed: ${job.error_message}`;
+      } else {
+        statusEl.textContent = `Processing... (${job.status})`;
+        setTimeout(() => pollStatus(jobId, token), 1500);
+      }
+    }
+
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) { statusEl.textContent = 'Choose a file first.'; return; }
+
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      if (!session) { statusEl.textContent = 'Please sign in first.'; return; }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      statusEl.textContent = 'Uploading...';
+      const res = await fetch(`${API_BASE_URL}/uploads`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData, // don't set Content-Type manually — browser sets the multipart boundary
+      });
+
+      if (!res.ok) { statusEl.textContent = 'Upload failed.'; return; }
+      const { jobId } = await res.json();
+      pollStatus(jobId, session.access_token);
+    });
+  </script>
+</body>
+</html>

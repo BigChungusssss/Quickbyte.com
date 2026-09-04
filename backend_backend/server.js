@@ -6,6 +6,8 @@ const { startCronJobs } = require('./cron');
 const { applyHardening, authRateLimiter } = require('./auth-and-security');
 const authRoutes = require('./auth-routes');
 const leaderRoutes = require('./leader-routes');
+const uploadRoutes = require('./upload-routes');
+const orderRoutes = require('./order-routes');
 
 const app = express();
 
@@ -34,10 +36,9 @@ app.use(express.json());
 
 // /auth/check-allowed (used by the sign-in page) and /admin/security-logs
 app.use(authRoutes);
-
 // /dev/check, /dev/leaders* — restricted to DEV_EMAILS only
 app.use(leaderRoutes);
-
+app.use(uploadRoutes); app.use(orderRoutes);
 // /orders (POST) requires an authenticated class leader — enforced inside
 // routes.js itself, since the GET /orders/:id/ready magic-link route in the
 // same router must stay public.
