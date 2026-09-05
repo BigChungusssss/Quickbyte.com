@@ -51,9 +51,10 @@ router.get('/dev/leaders', requireDev, async (req, res) => {
 router.post('/dev/leaders', requireDev, async (req, res) => {
   const { name, companyName, studentNumber, groupNumber, emails = [], isAdmin = false } = req.body || {};
   if (!name || !companyName || !studentNumber || !groupNumber || !Array.isArray(emails) || emails.length === 0) {
-    return res.status(400).json({ error: 'name, companyName, studentNumber, groupNumber and at least one email are required' });
+    return res.status(400).json({ error: 'All fields and at least one email are required' });
   }
 
+  // 1. Create the class leader record first
   const { data: leader, error: leaderErr } = await supabaseAdmin
     .from('class_leaders')
     .insert({
@@ -65,13 +66,51 @@ router.post('/dev/leaders', requireDev, async (req, res) => {
     })
     .select()
     .single();
+  
   if (leaderErr) return res.status(500).json({ error: 'Failed to create record' });
 
+  // 2. Insert their emails into class_leader_emails
   const rows = emails.map(email => ({ email: email.trim().toLowerCase(), class_leader_id: leader.id }));
   const { error: emailErr } = await supabaseAdmin.from('class_leader_emails').insert(rows);
   if (emailErr) {
     await supabaseAdmin.from('class_leaders').delete().eq('id', leader.id);
     return res.status(400).json({ error: 'One or more emails already in use' });
+  }
+
+  // 3. Replicate your manual SQL logic inside code:
+  const primaryEmail = emails[0].trim().toLowerCase();
+  
+  // Find if they already exist in auth.users
+  let authUser = await findAuthUserByEmail(primaryEmail);
+
+  // If not, create them in auth.users (just like Supabase Auth does)
+  if (!authUser) {
+    const { data: createdAuth, error: createAuthErr } = await supabaseAdmin.auth.admin.createUser({
+      email: primaryEmail,
+      email_confirm: true,
+    });
+    if (createAuthErr) {
+      console.error('Auth user creation error:', createAuthErr);
+    } else if (createdAuth?.user) {
+      authUser = createdAuth.user;
+    }
+  }
+
+  // Once we have the auth user ID, insert directly into profiles (like your manual SQL snippet)
+  if (authUser) {
+    const { error: profileErr } = await supabaseAdmin
+      .from('profiles')
+      .upsert({
+        id: authUser.id,
+        email: primaryEmail,
+        role: 'student',         // Default role
+        full_name: name,
+        class_leader_id: leader.id
+      });
+
+    if (profileErr) {
+      console.error('Profile insertion error:', profileErr);
+    }
   }
 
   res.status(201).json({ leader: { ...leader, emails: rows.map(r => r.email) } });
