@@ -19,9 +19,10 @@ router.get('/dev/leaders', requireDev, async (req, res) => {
     .select('email, class_leader_id');
   if (emailsErr) return res.status(500).json({ error: 'Failed to load emails' });
 
-  const result = leaders.map(l => ({
+  const result = (leaders || []).map(l => ({
     ...l,
-    emails: emails.filter(e => e.class_leader_id === l.id).map(e => e.email),
+    role: l.role || 'student',
+    emails: (emails || []).filter(e => e.class_leader_id === l.id).map(e => e.email),
   }));
 
   res.json({ leaders: result });
@@ -41,7 +42,7 @@ router.post('/dev/leaders', requireDev, async (req, res) => {
       student_number: studentNumber,
       group_number: groupNumber,
       is_admin: isAdmin,
-      role: 'student', // Default role upon creation
+      role: 'student', // Default role option
     })
     .select()
     .single();
