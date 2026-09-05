@@ -82,7 +82,12 @@ async function loadLeaders() {
       const res = await fetch(`${API_BASE_URL}/dev/leaders/${id}`, {
         method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ role }),
       });
-      if (!res.ok) { document.getElementById('msg').textContent = 'Could not update role.'; return; }
+      if (!res.ok) { 
+        const err = await res.json().catch(() => ({}));
+        document.getElementById('msg').textContent = err.error || 'Could not update role.'; 
+        return; 
+      }
+      document.getElementById('msg').textContent = '';
       loadLeaders();
     });
   });
