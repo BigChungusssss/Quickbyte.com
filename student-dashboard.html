@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Orders</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabaseClient.js"></script>
+  <script src="role-guard.js"></script>
+  <style>
+    body{ font-family:sans-serif; max-width:600px; margin:30px auto; padding:0 16px; }
+    .upload-box{ border:1px dashed #999; border-radius:6px; padding:16px; margin-bottom:24px; }
+    .order{ border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:10px; }
+    .toast{
+      position:fixed; top:16px; right:16px; background:#1C2420; color:#F5F2E6;
+      padding:12px 18px; border-radius:6px; font-size:14px; max-width:320px;
+      box-shadow:0 4px 12px rgba(0,0,0,.2); z-index:999;
+      animation: toast-in .2s ease-out;
+    }
+    @keyframes toast-in{ from{ opacity:0; transform:translateY(-8px);} to{ opacity:1; transform:translateY(0);} }
+  </style>
+</head>
+<body>
+  <h2>My Orders</h2>
+
+  <div class="upload-box">
+    <strong>Upload a new order</strong><br><br>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" />
+    <button id="uploadBtn">Upload</button>
+    <p id="uploadStatus"></p>
+  </div>
+
+  <div id="orders"></div>
+
+  <script>
+    const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
+    let accessToken = null;
+
+    function showToast(message) {
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 6000);
+    }
+
+    async function loadOrders() {
+      const res = await fetch(`${API_BASE_URL}/orders/mine`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return;
+      const { orders } = await res.json();
+
+      document.getElementById('orders').innerHTML = orders.map(o => `
+        <div class="order">
+          <strong>Order #${o.order_number}</strong> — ${o.status.replace('_', ' ')}
+          ${o.box_number ? ` — Box ${o.box_number}` : ''}
+          <div style="font-size:12px;color:#888;">${new Date(o.created_at).toLocaleString()} (v${o.version})</div>
+          <div style="font-size:13px;">${o.source_filename || ''}</div>
+          <button data-id="${o.id}" style="margin-top:6px;">Download my file</button>
+        </div>
+      `).join('') || '<p>No orders yet.</p>';
+
+      document.querySelectorAll('#orders button[data-id]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const res = await fetch(`${API_BASE_URL}/orders/mine/${btn.dataset.id}/download`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!res.ok) { alert('Could not get download link.'); return; }
+          const { url } = await res.json();
+          window.open(url, '_blank');
+        });
+      });
+    }
+
+    async function pollUploadStatus(jobId) {
+      const res = await fetch(`${API_BASE_URL}/uploads/${jobId}/status`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const job = await res.json();
+
+      if (job.status === 'succeeded') {
+        document.getElementById('uploadStatus').textContent = 'Order received!';
+        loadOrders();
+      } else if (job.status === 'failed') {
+        document.getElementById('uploadStatus').textContent = `Failed: ${job.error_message}`;
+      } else {
+        document.getElementById('uploadStatus').textContent = `Processing... (${job.status})`;
+        setTimeout(() => pollUploadStatus(jobId), 1500);
+      }
+    }
+
+    document.getElementById('uploadBtn').addEventListener('click', async () => {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) { document.getElementById('uploadStatus').textContent = 'Choose a file first.'; return; }
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      document.getElementById('uploadStatus').textContent = 'Uploading...';
+      const res = await fetch(`${API_BASE_URL}/uploads`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+
+      if (!res.ok) { document.getElementById('uploadStatus').textContent = 'Upload failed.'; return; }
+      const { jobId } = await res.json();
+      pollUploadStatus(jobId);
+    });
+
+    (async () => {
+      accessToken = await requireRole(['student']);
+      if (!accessToken) return;
+
+      await loadOrders();
+
+      // Live popups: order ready, order moved to waiting list — anything
+      // inserted into notifications for this student.
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      supabaseClient
+        .channel('my-notifications')
+        .on('postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'notifications', filter: `student_id=eq.${user.id}` },
+          (payload) => {
+            showToast(payload.new.message);
+            loadOrders(); // refresh status/box number shown
+          }
+        )
+        .subscribe();
+    })();
+  </script>
+</body>
+</html>

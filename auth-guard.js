@@ -1,6 +1,6 @@
 // auth-guard.js
 // Include AFTER supabaseClient.js on every page that requires a logged-in, 2FA'd user.
-// <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// <script src="supabase-js.min.js"></script>  (self-hosted, not CDN — see supabase-js.min.js)
 // <script src="supabaseClient.js"></script>
 // <script src="auth-guard.js"></script>
 
@@ -39,13 +39,38 @@ async function applySignInUI(accessToken) {
         const res = await fetch(`${AUTH_API_BASE_URL}/auth/check-allowed`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
-        const profile = await res.json();
-        greetingEl.textContent = `${profile.name}, ${profile.companyName} — Student #${profile.studentNumber}, Group ${profile.groupNumber}`;
-        profileIsAdmin = !!profile.isAdmin;
+        if (res.ok) {
+          const profile = await res.json();
+          greetingEl.textContent = `${profile.name}, ${profile.companyName} — Student #${profile.studentNumber}, Group ${profile.groupNumber}`;
+          profileIsAdmin = !!profile.isAdmin;
+        } else {
+          greetingEl.textContent = ''; // not a class leader — fine, they might be a student/supplier instead
+        }
       } catch (e) {
         greetingEl.textContent = '';
       }
     }
+
+    // Nav link to their own dashboard — only shown if they're actually a
+    // student/supplier/admin (checked via /auth/whoami). Class leaders and
+    // anyone else simply don't get this link; nothing else changes for them.
+    try {
+      const whoRes = await fetch(`${AUTH_API_BASE_URL}/auth/whoami`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (whoRes.ok) {
+        const who = await whoRes.json();
+        if (who.kind === 'profile') {
+          const dashboardHref = who.role === 'student' ? 'student-dashboard.html' : 'supplier-dashboard.html';
+          const navList = document.querySelector('nav ul');
+          if (navList && !document.getElementById('myDashboardLink')) {
+            const li = document.createElement('li');
+            li.innerHTML = `<a id="myDashboardLink" href="${dashboardHref}">My Dashboard</a>`;
+            navList.appendChild(li);
+          }
+        }
+      }
+    } catch (e) { /* not a student/supplier, or offline — show nothing */ }
 
     // Quiet checks: links only appear for the right people — everyone else,
     // this silently shows nothing. Not new access points, just shortcuts.
