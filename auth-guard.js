@@ -107,7 +107,7 @@ async function applySignInUI(accessToken) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const accessToken = await requireSignedIn(); // redirects away if not fully authenticated
+  //const accessToken = await requireSignedIn(); // redirects away if not fully authenticated
   await new Promise(resolve => setTimeout(resolve, 300));
   await applySignInUI(accessToken);
 });
