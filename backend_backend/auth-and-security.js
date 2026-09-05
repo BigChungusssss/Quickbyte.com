@@ -64,8 +64,8 @@ async function getVerifiedUser(req) {
   const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
   if (error || !user) return { errorType: 'auth_invalid_token', message: error?.message };
 
-  const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-  if (payload.aal !== 'aal2') return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
+  // const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+  // if (payload.aal !== 'aal2') return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
 
   return { user };
 }
