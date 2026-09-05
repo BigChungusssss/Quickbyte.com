@@ -224,11 +224,4 @@ document.getElementById('challengeVerifyBtn').addEventListener('click', async ()
 });
 
 // Runs on initial load AND right after Supabase redirects back from Google OAuth.
-async function initAuth() {
-  // Wait a split second for Supabase to parse OAuth tokens from the URL hash if returning from Google
-  await new Promise(resolve => setTimeout(resolve, 300));
-  await routeAfterAuth();
-}
-
-// Runs on initial load AND right after Supabase redirects back from Google OAuth.
-initAuth();
+routeAfterAuth();
