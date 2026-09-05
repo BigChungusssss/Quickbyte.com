@@ -15,38 +15,73 @@
     const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
     let accessToken = null;
 
+    function authHeaders() {
+      return { Authorization: `Bearer ${accessToken}` };
+    }
+
     async function fetchOrders() {
-      const res = await fetch(`${API_BASE_URL}/supplier/orders`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
+      const res = await fetch(`${API_BASE_URL}/supplier/orders`, { headers: authHeaders() });
       if (!res.ok) return;
       const { orders } = await res.json();
       renderOrders(orders);
     }
 
+    function groupByLeader(orders) {
+      const groups = {};
+      orders.forEach(o => {
+        const leaderName = o.class_leaders?.name || 'Unassigned';
+        if (!groups[leaderName]) groups[leaderName] = [];
+        groups[leaderName].push(o);
+      });
+      return groups;
+    }
+
     function renderOrders(orders) {
-      document.getElementById('orders').innerHTML = orders.map(o => `
-        <div style="border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:10px;">
-          <strong>Order #${o.order_number}</strong> — ${o.status}
-          ${o.box_number ? ` — Box ${o.box_number}` : ''}
-          <div style="font-size:13px;color:#666;">${o.profiles?.full_name || ''} (${o.profiles?.email || ''})</div>
-          ${o.order_items.map(it => `
-            <div style="display:flex;justify-content:space-between;padding:4px 0;">
-              <span>${it.category} — ${it.item_name} x${it.quantity}</span>
-              <button data-item="${it.id}" data-ready="${!it.is_ready}">
-                ${it.is_ready ? 'Ready ✓' : 'Mark ready'}
-              </button>
+      const groups = groupByLeader(orders);
+
+      document.getElementById('orders').innerHTML = Object.entries(groups).map(([leaderName, group]) => `
+        <h3 style="margin-top:24px;border-bottom:1px solid #ccc;padding-bottom:4px;">${leaderName}</h3>
+        ${group.map(o => `
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:10px;">
+            <strong>Order #${o.order_number}</strong> — ${o.status}
+            ${o.box_number ? ` — Box ${o.box_number}` : ''}
+            <span style="color:#888;font-size:12px;"> (v${o.version}, ${new Date(o.created_at).toLocaleString()})</span>
+            <div style="font-size:13px;color:#666;">${o.profiles?.full_name || ''} (${o.profiles?.email || ''})</div>
+            <div style="margin-top:8px;display:flex;gap:8px;">
+              <button data-action="download" data-id="${o.id}">Download file</button>
+              ${o.status !== 'ready' && o.status !== 'picked_up'
+                ? `<button data-action="ready" data-id="${o.id}">Mark ready</button>`
+                : ''}
+              ${o.status === 'ready'
+                ? `<button data-action="picked-up" data-id="${o.id}">Mark picked up</button>`
+                : ''}
             </div>
-          `).join('')}
-        </div>
+          </div>
+        `).join('')}
       `).join('');
 
-      document.querySelectorAll('button[data-item]').forEach(btn => {
+      document.querySelectorAll('[data-action="download"]').forEach(btn => {
         btn.addEventListener('click', async () => {
-          await fetch(`${API_BASE_URL}/supplier/order-items/${btn.dataset.item}/ready`, {
-            method: 'PATCH',
-            headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ready: btn.dataset.ready === 'true' }),
+          const res = await fetch(`${API_BASE_URL}/supplier/orders/${btn.dataset.id}/download`, { headers: authHeaders() });
+          if (!res.ok) { alert('Could not get download link.'); return; }
+          const { url } = await res.json();
+          window.open(url, '_blank');
+        });
+      });
+
+      document.querySelectorAll('[data-action="ready"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await fetch(`${API_BASE_URL}/supplier/orders/${btn.dataset.id}/ready`, {
+            method: 'PATCH', headers: authHeaders(),
+          });
+          fetchOrders();
+        });
+      });
+
+      document.querySelectorAll('[data-action="picked-up"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await fetch(`${API_BASE_URL}/supplier/orders/${btn.dataset.id}/picked-up`, {
+            method: 'POST', headers: authHeaders(),
           });
           fetchOrders();
         });
@@ -55,18 +90,14 @@
 
     (async () => {
       const { data: { session } } = await supabaseClient.auth.getSession();
-      if (!session) { window.location.href = '../Sign/signin.html'; return; }
+      if (!session) { document.body.innerHTML = '<p>Please sign in first.</p>'; return; }
       accessToken = session.access_token;
 
       await fetchOrders();
 
-      // Realtime: refetch whenever orders or order_items change anywhere.
-      // Simple approach for MVP — swap for targeted cache updates later if
-      // the order volume grows large enough that a full refetch feels slow.
       supabaseClient
         .channel('supplier-orders')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, fetchOrders)
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, fetchOrders)
         .subscribe();
     })();
   </script>

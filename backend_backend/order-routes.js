@@ -1,16 +1,18 @@
 // order-routes.js
 const express = require('express');
-const { supabaseAdmin, logSecurityEvent } = require('./auth-and-security');
+const { supabaseAdmin } = require('./auth-and-security');
 const { requireProfile, requireRole } = require('./roles');
 const { releaseBoxForOrder } = require('./box-logic');
 
 const router = express.Router();
 
-// GET /orders/mine  (student)
+const SIGNED_URL_EXPIRY_SECONDS = 60 * 5; // 5 minutes — plenty for a single download click
+
+// GET /orders/mine  (student) — their own order history, grouped by leader implicitly via class_leader_id
 router.get('/orders/mine', requireProfile, requireRole('student'), async (req, res) => {
   const { data: orders, error } = await supabaseAdmin
     .from('orders')
-    .select('*, order_items(*)')
+    .select('id, order_number, source_filename, status, box_number, version, created_at, updated_at')
     .eq('student_id', req.user.id)
     .order('created_at', { ascending: false });
 
@@ -18,11 +20,31 @@ router.get('/orders/mine', requireProfile, requireRole('student'), async (req, r
   res.json({ orders });
 });
 
-// GET /supplier/orders  (supplier) — optional ?status= and ?classLeaderId= filters
+// GET /orders/mine/:id/download  (student) — signed URL to their own file
+router.get('/orders/mine/:id/download', requireProfile, requireRole('student'), async (req, res) => {
+  const { data: order } = await supabaseAdmin
+    .from('orders')
+    .select('file_storage_path')
+    .eq('id', req.params.id)
+    .eq('student_id', req.user.id) // students can only download their own
+    .maybeSingle();
+
+  if (!order?.file_storage_path) return res.status(404).json({ error: 'File not found' });
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('order-uploads')
+    .createSignedUrl(order.file_storage_path, SIGNED_URL_EXPIRY_SECONDS);
+
+  if (error) return res.status(500).json({ error: 'Failed to create download link' });
+  res.json({ url: data.signedUrl });
+});
+
+// GET /supplier/orders  (supplier) — list, organized by leader; optional ?status= and ?classLeaderId= filters
 router.get('/supplier/orders', requireProfile, requireRole('supplier'), async (req, res) => {
   let query = supabaseAdmin
     .from('orders')
-    .select('*, order_items(*), profiles!orders_student_id_fkey(full_name, email)')
+    .select('*, profiles!orders_student_id_fkey(full_name, email), class_leaders(name)')
+    .order('class_leader_id', { ascending: true })
     .order('created_at', { ascending: false });
 
   if (req.query.status) query = query.eq('status', req.query.status);
@@ -33,39 +55,40 @@ router.get('/supplier/orders', requireProfile, requireRole('supplier'), async (r
   res.json({ orders });
 });
 
-// PATCH /supplier/order-items/:id/ready  (supplier)
-// body: { ready: true|false }
-router.patch('/supplier/order-items/:id/ready', requireProfile, requireRole('supplier'), async (req, res) => {
-  const ready = !!req.body.ready;
-
-  const { data: item, error: itemErr } = await supabaseAdmin
-    .from('order_items')
-    .update({ is_ready: ready, ready_at: ready ? new Date().toISOString() : null })
+// GET /supplier/orders/:id/download  (supplier) — signed URL to any order's file
+router.get('/supplier/orders/:id/download', requireProfile, requireRole('supplier'), async (req, res) => {
+  const { data: order } = await supabaseAdmin
+    .from('orders')
+    .select('file_storage_path')
     .eq('id', req.params.id)
-    .select('*, orders(id, student_id, box_number, status)')
+    .maybeSingle();
+
+  if (!order?.file_storage_path) return res.status(404).json({ error: 'File not found' });
+
+  const { data, error } = await supabaseAdmin.storage
+    .from('order-uploads')
+    .createSignedUrl(order.file_storage_path, SIGNED_URL_EXPIRY_SECONDS);
+
+  if (error) return res.status(500).json({ error: 'Failed to create download link' });
+  res.json({ url: data.signedUrl });
+});
+
+// PATCH /supplier/orders/:id/ready  (supplier) — marks the whole order ready, notifies the student
+router.patch('/supplier/orders/:id/ready', requireProfile, requireRole('supplier'), async (req, res) => {
+  const { data: order, error } = await supabaseAdmin
+    .from('orders')
+    .update({ status: 'ready' })
+    .eq('id', req.params.id)
+    .select('id, student_id, box_number')
     .single();
 
-  if (itemErr || !item) return res.status(404).json({ error: 'Item not found' });
+  if (error || !order) return res.status(404).json({ error: 'Order not found' });
 
-  if (ready) {
-    // In-app notification only — no email, per requirements.
-    await supabaseAdmin.from('notifications').insert({
-      student_id: item.orders.student_id,
-      order_id: item.orders.id,
-      message: `${item.item_name} is ready — box ${item.orders.box_number ?? 'TBD'}.`,
-    });
-  }
-
-  // If every item on this order is now ready, mark the whole order ready.
-  const { data: siblings } = await supabaseAdmin
-    .from('order_items')
-    .select('is_ready')
-    .eq('order_id', item.orders.id);
-
-  const allReady = siblings.every(s => s.is_ready);
-  if (allReady && item.orders.status !== 'ready') {
-    await supabaseAdmin.from('orders').update({ status: 'ready' }).eq('id', item.orders.id);
-  }
+  await supabaseAdmin.from('notifications').insert({
+    student_id: order.student_id,
+    order_id: order.id,
+    message: `Your order is ready — box ${order.box_number ?? 'TBD'}.`,
+  });
 
   res.json({ ok: true });
 });
