@@ -61,13 +61,23 @@ async function getVerifiedUser(req) {
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return { errorType: 'auth_missing_token', message: 'No bearer token supplied' };
 
-  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !user) return { errorType: 'auth_invalid_token', message: error?.message };
+  try {
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) {
+      return { errorType: 'auth_invalid_token', message: error?.message || 'User does not exist' };
+    }
 
-  // const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-  // if (payload.aal !== 'aal2') return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
+    // --- RE-ENABLE 2FA CHECK ---
+    // const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+    // if (payload.aal !== 'aal2') {
+    //   return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
+    // }
+    // // ----------------------------
 
-  return { user };
+    return { user };
+  } catch (err) {
+    return { errorType: 'auth_invalid_token', message: err.message };
+  }
 }
 
 /* ---------------- auth middleware ---------------- */
