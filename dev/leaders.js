@@ -13,7 +13,17 @@ async function loadLeaders() {
 
   document.getElementById('leaders').innerHTML = leaders.map(l => `
     <div class="leader" data-id="${l.id}">
-      <h3>${l.name} ${l.is_admin ? '(admin)' : ''}</h3>
+      <h3>${l.name} ${l.is_admin ? '(admin)' : ''} — <strong>Role: ${l.role || 'student'}</strong></h3>
+      <div class="meta" style="margin-bottom:8px;">
+        <label style="display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:12px;">
+          Set Role:
+          <select data-field="role-select" data-id="${l.id}" style="padding:4px; font-family:var(--font-mono);">
+            <option value="student" ${l.role === 'student' ? 'selected' : ''}>Student</option>
+            <option value="supplier" ${l.role === 'supplier' ? 'selected' : ''}>Supplier</option>
+          </select>
+        </label>
+        <button data-action="save-role" data-id="${l.id}">Update Role</button>
+      </div>
       <div class="meta">
         Company: <input data-field="company_name" data-id="${l.id}" value="${l.company_name}" />
         Student #: <input data-field="student_number" data-id="${l.id}" value="${l.student_number}" />
@@ -30,7 +40,7 @@ async function loadLeaders() {
         <input placeholder="add another email" id="add-email-${l.id}" style="flex:1;margin-right:6px;" />
         <button data-action="add-email" data-id="${l.id}">add</button>
       </div>
-      <button data-action="remove-leader" data-id="${l.id}">Remove leader entirely</button>
+      <button data-action="remove-leader" data-id="${l.id}">Remove person entirely</button>
     </div>
   `).join('');
 
@@ -58,8 +68,21 @@ async function loadLeaders() {
 
   document.querySelectorAll('[data-action="remove-leader"]').forEach(btn => {
     btn.addEventListener('click', async () => {
-      if (!confirm('Remove this leader and all their emails?')) return;
+      if (!confirm('Remove this person and all their emails?')) return;
       await fetch(`${API_BASE_URL}/dev/leaders/${btn.dataset.id}`, { method: 'DELETE', headers: authHeaders() });
+      loadLeaders();
+    });
+  });
+
+  document.querySelectorAll('[data-action="save-role"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const personEl = document.querySelector(`.leader[data-id="${id}"]`);
+      const role = personEl.querySelector('[data-field="role-select"]').value;
+      const res = await fetch(`${API_BASE_URL}/dev/leaders/${id}`, {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ role }),
+      });
+      if (!res.ok) { document.getElementById('msg').textContent = 'Could not update role.'; return; }
       loadLeaders();
     });
   });
@@ -96,7 +119,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     method: 'POST', headers: authHeaders(),
     body: JSON.stringify({ name, companyName, studentNumber, groupNumber, emails, isAdmin }),
   });
-  if (!res.ok) { document.getElementById('msg').textContent = 'Could not add leader (check required fields / duplicate emails).'; return; }
+  if (!res.ok) { document.getElementById('msg').textContent = 'Could not add person (check required fields / duplicate emails).'; return; }
   e.target.reset();
   loadLeaders();
 });

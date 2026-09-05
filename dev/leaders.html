@@ -3,26 +3,27 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Class leaders</title>
+  <title>Manage People</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="../supabaseClient.js"></script>
   <link rel="stylesheet" href="leaders.css">
 </head>
 <body>
-  <h2>Class leaders</h2>
+  <h2>People Management</h2>
   <p id="msg"></p>
 
   <form class="add-leader" id="addForm">
-    <strong>Add a class leader</strong>
+    <strong>Add a person</strong>
     <input id="newName" placeholder="Name" required />
     <input id="newCompany" placeholder="Company name" required />
     <input id="newStudentNumber" placeholder="Student number" required />
     <input id="newGroupNumber" placeholder="Group number" required />
     <input id="newEmails" placeholder="Emails, comma-separated (e.g. jane@gmail.com, jane@wits.ac.za)" required />
-    <label class="admin-check"><input type="checkbox" id="newIsAdmin" /> Make this person an admin too</label>
-    <button type="submit">Add leader</button>
+    <label class="admin-check"><input type="checkbox" id="newIsAdmin" /> Make this person an admin</label>
+    <button type="submit">Add person</button>
   </form>
 
+  <h3>Registered People</h3>
   <div id="leaders"></div>
 
   <script src="leaders.js"></script>
