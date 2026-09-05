@@ -14,8 +14,8 @@ async function requireSignedIn() {
   const { data: { session } } = await supabaseClient.auth.getSession();
   if (!session) { window.location.href = SIGNIN_PAGE; return null; }
 
-  const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (aalData.currentLevel !== 'aal2') { window.location.href = SIGNIN_PAGE; return null; }
+  // const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+  // if (aalData.currentLevel !== 'aal2') { window.location.href = SIGNIN_PAGE; return null; }
 
   return session.access_token;
 }
@@ -107,7 +107,7 @@ async function applySignInUI(accessToken) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
-  //const accessToken = await requireSignedIn(); // redirects away if not fully authenticated
+  const accessToken = await requireSignedIn(); // redirects away if not fully authenticated
   await new Promise(resolve => setTimeout(resolve, 300));
   await applySignInUI(accessToken);
 });
