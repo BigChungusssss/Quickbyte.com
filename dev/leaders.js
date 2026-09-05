@@ -1,113 +1,109 @@
 const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
 let accessToken = null;
-let cachedUsers = [];
 
 function authHeaders() {
   return { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' };
 }
 
-/* ============ ROLE-BASED FORM SWITCHING ============ */
-function updateFormForRole() {
-  const role = document.getElementById('roleSelect').value;
-  const classLeaderSelect = document.getElementById('personClassLeaderId');
-  
-  // Only students need to be linked to another group/leader if applicable
-  if (classLeaderSelect) {
-    classLeaderSelect.style.display = role === 'student' ? 'block' : 'none';
-    if (role === 'student') {
-      classLeaderSelect.innerHTML = cachedUsers
-        .map(u => `<option value="${u.id}">${u.full_name || u.email} (id ${u.id})</option>`).join('');
-    }
-  }
-}
-document.getElementById('roleSelect').addEventListener('change', updateFormForRole);
+async function loadLeaders() {
+  const res = await fetch(`${API_BASE_URL}/dev/leaders`, { headers: authHeaders() });
+  if (res.status === 401) { window.location.href = '../Sign/signin.html'; return; }
+  if (res.status === 403) { document.getElementById('msg').textContent = "You're signed in but not an admin."; return; }
+  const { leaders } = await res.json();
 
-/* ============ LOAD & RENDER ============ */
-async function loadAll() {
-  const res = await fetch(`${API_BASE_URL}/dev/users`, { headers: authHeaders() });
-  if (res.status === 401) { window.location.href = '../Frontend/Sign/signin.html'; return; }
-  if (res.status === 403) { document.getElementById('msg').textContent = "You're signed in but not a dev."; return; }
-  const { users } = await res.json();
-  cachedUsers = users;
-  updateFormForRole();
-
-  renderUsers(users);
-}
-
-function renderUsers(users) {
-  document.getElementById('users').innerHTML = users.map(u => `
-    <div class="user-card" data-id="${u.id}">
-      <h3>${u.full_name || '(no name)'} — ${u.role} ${u.is_admin ? '(Admin)' : ''}</h3>
+  document.getElementById('leaders').innerHTML = leaders.map(l => `
+    <div class="leader" data-id="${l.id}">
+      <h3>${l.name} ${l.is_admin ? '(admin)' : ''}</h3>
       <div class="meta">
-        <span>Email: ${u.email}</span>
-        <label>
-          <input type="checkbox" data-field="is_admin" data-id="${u.id}" ${u.is_admin ? 'checked' : ''} /> Admin
-        </label>
-        <button data-action="save-admin" data-id="${u.id}">save</button>
+        Company: <input data-field="company_name" data-id="${l.id}" value="${l.company_name}" />
+        Student #: <input data-field="student_number" data-id="${l.id}" value="${l.student_number}" />
+        Group: <input data-field="group_number" data-id="${l.id}" value="${l.group_number}" />
+        <button data-action="save-meta" data-id="${l.id}">save</button>
       </div>
-      <button data-action="remove-user" data-id="${u.id}">Remove user role</button>
+      ${l.emails.map(e => `
+        <div class="email-row">
+          <span>${e}</span>
+          <button data-action="remove-email" data-id="${l.id}" data-email="${e}">remove</button>
+        </div>
+      `).join('')}
+      <div class="email-row" style="margin-top:6px;">
+        <input placeholder="add another email" id="add-email-${l.id}" style="flex:1;margin-right:6px;" />
+        <button data-action="add-email" data-id="${l.id}">add</button>
+      </div>
+      <button data-action="remove-leader" data-id="${l.id}">Remove leader entirely</button>
     </div>
-  `).join('') || '<p style="color:var(--ink-soft);font-size:13px;">None yet.</p>';
+  `).join('');
 
-  document.querySelectorAll('[data-action="save-admin"]').forEach(btn => {
+  document.querySelectorAll('[data-action="remove-email"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await fetch(`${API_BASE_URL}/dev/leaders/${btn.dataset.id}/emails/${encodeURIComponent(btn.dataset.email)}`, {
+        method: 'DELETE', headers: authHeaders(),
+      });
+      loadLeaders();
+    });
+  });
+
+  document.querySelectorAll('[data-action="add-email"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const input = document.getElementById(`add-email-${btn.dataset.id}`);
+      const email = input.value.trim();
+      if (!email) return;
+      const res = await fetch(`${API_BASE_URL}/dev/leaders/${btn.dataset.id}/emails`, {
+        method: 'POST', headers: authHeaders(), body: JSON.stringify({ email }),
+      });
+      if (!res.ok) { document.getElementById('msg').textContent = 'Could not add that email (maybe already in use).'; return; }
+      loadLeaders();
+    });
+  });
+
+  document.querySelectorAll('[data-action="remove-leader"]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Remove this leader and all their emails?')) return;
+      await fetch(`${API_BASE_URL}/dev/leaders/${btn.dataset.id}`, { method: 'DELETE', headers: authHeaders() });
+      loadLeaders();
+    });
+  });
+
+  document.querySelectorAll('[data-action="save-meta"]').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id;
-      const cardEl = document.querySelector(`.user-card[data-id="${id}"]`);
-      const isAdmin = cardEl.querySelector('[data-field="is_admin"]').checked;
-      
-      const res = await fetch(`${API_BASE_URL}/dev/users/${id}`, {
-        method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ isAdmin }),
+      const leaderEl = document.querySelector(`.leader[data-id="${id}"]`);
+      const body = {
+        companyName: leaderEl.querySelector('[data-field="company_name"]').value.trim(),
+        studentNumber: leaderEl.querySelector('[data-field="student_number"]').value.trim(),
+        groupNumber: leaderEl.querySelector('[data-field="group_number"]').value.trim(),
+      };
+      const res = await fetch(`${API_BASE_URL}/dev/leaders/${id}`, {
+        method: 'PATCH', headers: authHeaders(), body: JSON.stringify(body),
       });
       if (!res.ok) { document.getElementById('msg').textContent = 'Could not save changes.'; return; }
-      loadAll();
-    });
-  });
-
-  document.querySelectorAll('[data-action="remove-user"]').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      if (!confirm('Remove this user role assignment?')) return;
-      const res = await fetch(`${API_BASE_URL}/dev/users/${btn.dataset.id}`, { method: 'DELETE', headers: authHeaders() });
-      if (!res.ok) {
-        document.getElementById('msg').textContent = 'Could not remove this user.';
-        return;
-      }
-      loadAll();
+      loadLeaders();
     });
   });
 }
 
-/* ============ ADD FORM SUBMIT ============ */
 document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   document.getElementById('msg').textContent = '';
-  const role = document.getElementById('roleSelect').value;
+  const name = document.getElementById('newName').value.trim();
+  const companyName = document.getElementById('newCompany').value.trim();
+  const studentNumber = document.getElementById('newStudentNumber').value.trim();
+  const groupNumber = document.getElementById('newGroupNumber').value.trim();
+  const emails = document.getElementById('newEmails').value.split(',').map(s => s.trim()).filter(Boolean);
+  const isAdmin = document.getElementById('newIsAdmin').checked;
 
-  const body = {
-    role,
-    email: document.getElementById('personEmail').value.trim(),
-    fullName: document.getElementById('personFullName').value.trim(),
-    isAdmin: document.getElementById('newIsAdmin')?.checked || false,
-    classLeaderId: role === 'student' ? Number(document.getElementById('personClassLeaderId').value) : null,
-  };
-
-  const res = await fetch(`${API_BASE_URL}/dev/users`, {
-    method: 'POST', headers: authHeaders(), body: JSON.stringify(body),
+  const res = await fetch(`${API_BASE_URL}/dev/leaders`, {
+    method: 'POST', headers: authHeaders(),
+    body: JSON.stringify({ name, companyName, studentNumber, groupNumber, emails, isAdmin }),
   });
-
-  if (!res.ok) {
-    const errBody = await res.json().catch(() => ({}));
-    document.getElementById('msg').textContent = errBody.error || 'Could not add this user.';
-    return;
-  }
-
+  if (!res.ok) { document.getElementById('msg').textContent = 'Could not add leader (check required fields / duplicate emails).'; return; }
   e.target.reset();
-  updateFormForRole();
-  loadAll();
+  loadLeaders();
 });
 
 (async () => {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) { window.location.href = '../Frontend/Sign/signin.html'; return; }
+  if (!session) { window.location.href = '../Sign/signin.html'; return; }
   accessToken = session.access_token;
 
   const check = await fetch(`${API_BASE_URL}/dev/check`, { headers: authHeaders() });
@@ -116,5 +112,5 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
     return;
   }
 
-  loadAll();
+  loadLeaders();
 })();

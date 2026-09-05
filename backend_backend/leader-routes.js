@@ -1,86 +1,127 @@
+// leader-routes.js
+// In your main server file:
+//   const leaderRoutes = require('./leader-routes');
+//   app.use(leaderRoutes);
+// Every route here is dev-only (requireDev) — restricted to the emails listed in
+// the DEV_EMAILS env var, regardless of anything in the class_leaders table.
+
 const express = require('express');
 const { requireDev, supabaseAdmin, logSecurityEvent } = require('./auth-and-security');
 
 const router = express.Router();
 
+// Lets the dev-area frontend confirm access before rendering anything.
 router.get('/dev/check', requireDev, (req, res) => {
   res.json({ ok: true, email: req.user.email });
 });
 
-// List every user profile with their role and admin status
-router.get('/dev/users', requireDev, async (req, res) => {
-  const { data: users, error: usersErr } = await supabaseAdmin
+// List every class leader and the emails attached to each.
+router.get('/dev/leaders', requireDev, async (req, res) => {
+  const { data: leaders, error: leadersErr } = await supabaseAdmin
+    .from('class_leaders')
+    .select('id, name, company_name, student_number, group_number, is_admin, created_at')
+    .order('name');
+  if (leadersErr) return res.status(500).json({ error: 'Failed to load leaders' });
+
+  const { data: emails, error: emailsErr } = await supabaseAdmin
+    .from('class_leader_emails')
+    .select('email, class_leader_id');
+  if (emailsErr) return res.status(500).json({ error: 'Failed to load emails' });
+
+  const result = leaders.map(l => ({
+    ...l,
+    emails: emails.filter(e => e.class_leader_id === l.id).map(e => e.email),
+  }));
+
+  const { data: people, error: peopleErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, email, role, full_name, is_admin, class_leader_id, created_at')
+    .select('id, email, role, full_name, class_leader_id, created_at')
     .order('created_at', { ascending: false });
-  if (usersErr) return res.status(500).json({ error: 'Failed to load users' });
+  if (peopleErr) return res.status(500).json({ error: 'Failed to load people' });
 
-  res.json({ users });
+
+  res.json({ leaders: result });
 });
 
-async function findAuthUserByEmail(email) {
-  const { data: usersPage, error } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-  if (error) throw error;
-  return usersPage.users.find(u => u.email?.toLowerCase() === email.trim().toLowerCase());
-}
-
-// Create or assign a role to a user (student or supplier, with optional admin flag)
-router.post('/dev/users', requireDev, async (req, res) => {
-  const { role, email, fullName, isAdmin = false, classLeaderId } = req.body || {};
-
-  if (!email || !role) return res.status(400).json({ error: 'email and role are required' });
-  if (role === 'student' && !classLeaderId) {
-    return res.status(400).json({ error: 'classLeaderId is required for students' });
+// Create a new class leader with one or more starting emails.
+// body: { name, companyName, studentNumber, groupNumber, emails: [...], isAdmin: false }
+router.post('/dev/leaders', requireDev, async (req, res) => {
+  const { name, companyName, studentNumber, groupNumber, emails = [], isAdmin = false } = req.body || {};
+  if (!name || !companyName || !studentNumber || !groupNumber || !Array.isArray(emails) || emails.length === 0) {
+    return res.status(400).json({ error: 'name, companyName, studentNumber, groupNumber and at least one email are required' });
   }
 
-  let authUser;
-  try {
-    authUser = await findAuthUserByEmail(email);
-  } catch (e) {
-    return res.status(500).json({ error: 'Failed to look up user' });
-  }
-  if (!authUser) {
-    return res.status(404).json({ error: 'No account found for that email — they need to sign in with Google at least once first' });
+  const { data: leader, error: leaderErr } = await supabaseAdmin
+    .from('class_leaders')
+    .insert({
+      name,
+      company_name: companyName,
+      student_number: studentNumber,
+      group_number: groupNumber,
+      is_admin: isAdmin,
+    })
+    .select()
+    .single();
+  if (leaderErr) return res.status(500).json({ error: 'Failed to create leader' });
+
+  const rows = emails.map(email => ({ email: email.trim().toLowerCase(), class_leader_id: leader.id }));
+  const { error: emailErr } = await supabaseAdmin.from('class_leader_emails').insert(rows);
+  if (emailErr) {
+    // Roll back the leader if the emails failed (e.g. duplicate email already in use).
+    await supabaseAdmin.from('class_leaders').delete().eq('id', leader.id);
+    return res.status(400).json({ error: 'One or more emails already in use' });
   }
 
-  const { error: upsertErr } = await supabaseAdmin
-    .from('profiles')
-    .upsert({
-      id: authUser.id,
-      email: authUser.email,
-      role, // 'student' or 'supplier'
-      full_name: fullName || null,
-      is_admin: Boolean(isAdmin),
-      class_leader_id: role === 'student' ? classLeaderId : null,
-    });
-
-  if (upsertErr) return res.status(500).json({ error: 'Failed to save user role' });
-  return res.status(201).json({ ok: true });
+  res.status(201).json({ leader: { ...leader, emails: rows.map(r => r.email) } });
 });
 
-// Update a user's admin status
-router.patch('/dev/users/:id', requireDev, async (req, res) => {
-  const { isAdmin } = req.body || {};
-  if (isAdmin === undefined) return res.status(400).json({ error: 'No fields to update' });
+// Edit a leader's name/company/student number/group number (not their emails — use the /emails routes for that).
+// body: any subset of { name, companyName, studentNumber, groupNumber, isAdmin }
+router.patch('/dev/leaders/:id', requireDev, async (req, res) => {
+  const { name, companyName, studentNumber, groupNumber, isAdmin } = req.body || {};
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (companyName !== undefined) updates.company_name = companyName;
+  if (studentNumber !== undefined) updates.student_number = studentNumber;
+  if (groupNumber !== undefined) updates.group_number = groupNumber;
+  if (isAdmin !== undefined) updates.is_admin = isAdmin;
 
-  const { error } = await supabaseAdmin
-    .from('profiles')
-    .update({ is_admin: Boolean(isAdmin) })
-    .eq('id', req.params.id);
+  if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'No fields to update' });
 
-  if (error) return res.status(500).json({ error: 'Failed to update user' });
+  const { error } = await supabaseAdmin.from('class_leaders').update(updates).eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: 'Failed to update leader' });
   res.json({ ok: true });
 });
 
-// Remove a user's role assignment
-router.delete('/dev/users/:id', requireDev, async (req, res) => {
-  const { error } = await supabaseAdmin.from('profiles').delete().eq('id', req.params.id);
-  if (error) {
-    if (error.code === '23503') {
-      return res.status(409).json({ error: "Can't remove — this person has existing orders/notifications." });
-    }
-    return res.status(500).json({ error: 'Failed to remove user' });
-  }
+// Add another email to an existing leader (e.g. their school email as well as personal Gmail).
+router.post('/dev/leaders/:id/emails', requireDev, async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'email is required' });
+
+  const { error } = await supabaseAdmin
+    .from('class_leader_emails')
+    .insert({ email: email.trim().toLowerCase(), class_leader_id: req.params.id });
+
+  if (error) return res.status(400).json({ error: 'Email already in use or leader does not exist' });
+  res.status(201).json({ ok: true });
+});
+
+// Remove one email from a leader (doesn't delete the leader).
+router.delete('/dev/leaders/:id/emails/:email', requireDev, async (req, res) => {
+  const { error } = await supabaseAdmin
+    .from('class_leader_emails')
+    .delete()
+    .eq('class_leader_id', req.params.id)
+    .eq('email', req.params.email.toLowerCase());
+  if (error) return res.status(500).json({ error: 'Failed to remove email' });
+  res.json({ ok: true });
+});
+
+// Remove a leader entirely (cascades and removes all their emails too).
+router.delete('/dev/leaders/:id', requireDev, async (req, res) => {
+  const { error } = await supabaseAdmin.from('class_leaders').delete().eq('id', req.params.id);
+  if (error) return res.status(500).json({ error: 'Failed to remove leader' });
+  await logSecurityEvent({ req, type: 'leader_removed', detail: `Leader ${req.params.id} removed`, email: req.user.email });
   res.json({ ok: true });
 });
 
