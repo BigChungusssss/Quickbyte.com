@@ -11,6 +11,8 @@ const orderRoutes = require('./order-routes');
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // Security headers, CORS lockdown, and trust proxy — do this before anything else.
 //applyHardening(app, { allowedOrigin: process.env.ALLOWED_ORIGIN || 'http://localhost:5500' });
 const allowedOrigins = [
