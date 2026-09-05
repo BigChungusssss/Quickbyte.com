@@ -7,6 +7,12 @@ const RESEND_API_KEY = process.env.RESEND_API_KEY;
 const FROM_ADDRESS = process.env.ORDERS_FROM_EMAIL || 'orders@yourdomain.com';
 
 async function sendEmail({ to, subject, html }) {
+  // Check if emails are temporarily paused
+  if (process.env.EMAIL_ENABLED === 'false') {
+    console.log(`[Email Paused] Skipped sending to ${to} with subject: "${subject}"`);
+    return { id: 'email-service-paused' }; // Returns a mock object so code waiting for a response doesn't break
+  }
+
   const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: {
