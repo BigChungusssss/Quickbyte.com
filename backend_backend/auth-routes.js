@@ -22,7 +22,7 @@ router.get('/auth/check-allowed', requireAuth, (req, res) => {
     isAdmin: req.user.isAdmin,
   });
 });
-
+//
 // Used ONLY by signin.js right after login, to decide where to send someone.
 // Checks profiles first (student/supplier/admin), then falls back to the
 // class_leader system — these are two independent populations that can
