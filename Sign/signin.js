@@ -10,7 +10,7 @@ const stepLogin = document.getElementById('step-login');
 const stepEnroll = document.getElementById('step-enroll');
 const stepChallenge = document.getElementById('step-challenge');
 const msg = document.getElementById('msg');
-
+//
 let pendingFactorId = null;
 let pendingChallengeId = null;
 
