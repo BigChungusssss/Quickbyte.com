@@ -3,14 +3,15 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>My Orders</title>
+  <title>My Orders & Notifications</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="supabaseClient.js"></script>
   <script src="role-guard.js"></script>
   <style>
     body{ font-family:sans-serif; max-width:600px; margin:30px auto; padding:0 16px; }
-    .upload-box{ border:1px dashed #999; border-radius:6px; padding:16px; margin-bottom:24px; }
-    .order{ border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:10px; }
+    .section{ border:1px solid #ddd; border-radius:6px; padding:16px; margin-bottom:24px; background:#fafafa; }
+    .order, .notification{ border:1px solid #ddd; border-radius:6px; padding:12px; margin-bottom:10px; background:#fff; }
+    .notification.unread { border-left: 4px solid #007bff; background: #f0f7ff; }
     .toast{
       position:fixed; top:16px; right:16px; background:#1C2420; color:#F5F2E6;
       padding:12px 18px; border-radius:6px; font-size:14px; max-width:320px;
@@ -21,15 +22,16 @@
   </style>
 </head>
 <body>
-  <h2>My Orders</h2>
+  <h2>My Dashboard</h2>
 
-  <div class="upload-box">
-    <strong>Upload a new order</strong><br><br>
-    <input type="file" id="fileInput" accept=".xlsx,.xls" />
-    <button id="uploadBtn">Upload</button>
-    <p id="uploadStatus"></p>
+  <!-- Notifications Section -->
+  <div class="section">
+    <h3>Notifications</h3>
+    <div id="notifications-list"><p style="font-size:13px;color:#666;">Loading notifications...</p></div>
   </div>
 
+  <!-- Orders Section -->
+  <h3>My Orders</h3>
   <div id="orders"></div>
 
   <script>
@@ -43,6 +45,38 @@
       setTimeout(() => toast.remove(), 6000);
     }
 
+    async function loadNotifications() {
+      const res = await fetch(`${API_BASE_URL}/notifications/mine`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!res.ok) return;
+      const { notifications } = await res.json();
+
+      const container = document.getElementById('notifications-list');
+      if (!notifications || notifications.length === 0) {
+        container.innerHTML = '<p style="font-size:13px;color:#666;">No notifications yet.</p>';
+        return;
+      }
+
+      container.innerHTML = notifications.map(n => `
+        <div class="notification ${n.is_read ? '' : 'unread'}">
+          <div style="font-size:14px;">${n.message}</div>
+          <div style="font-size:11px;color:#888;margin-top:4px;">${new Date(n.created_at).toLocaleString()}</div>
+          ${!n.is_read ? `<button data-action="mark-read" data-id="${n.id}" style="margin-top:6px;font-size:11px;">Mark as Read</button>` : ''}
+        </div>
+      `).join('');
+
+      document.querySelectorAll('[data-action="mark-read"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          await fetch(`${API_BASE_URL}/notifications/${btn.dataset.id}/read`, {
+            method: 'PATCH',
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          loadNotifications();
+        });
+      });
+    }
+
     async function loadOrders() {
       const res = await fetch(`${API_BASE_URL}/orders/mine`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -52,70 +86,26 @@
 
       document.getElementById('orders').innerHTML = orders.map(o => `
         <div class="order">
-          <strong>Order #${o.order_number}</strong> — ${o.status.replace('_', ' ')}
-          ${o.box_number ? ` — Box ${o.box_number}` : ''}
-          <div style="font-size:12px;color:#888;">${new Date(o.created_at).toLocaleString()} (v${o.version})</div>
-          <div style="font-size:13px;">${o.source_filename || ''}</div>
-          <button data-id="${o.id}" style="margin-top:6px;">Download my file</button>
+          <strong>Order #${o.order_number}</strong> — <strong>Status:</strong> ${o.status.replace('_', ' ')}
+          ${o.box_number ? ` — 📦 Box ${o.box_number}` : ''}
+          <div style="font-size:12px;color:#888;margin:4px 0;">${new Date(o.created_at).toLocaleString()} (v${o.version})</div>
+          
+          ${o.items ? `
+            <ul style="margin:8px 0;padding-left:18px;font-size:13px;">
+              ${o.items.map(it => `<li>${it.name}${it.variantLabel ? ` (${it.variantLabel})` : ''} × ${it.qty}</li>`).join('')}
+            </ul>
+          ` : ''}
         </div>
       `).join('') || '<p>No orders yet.</p>';
-
-      document.querySelectorAll('#orders button[data-id]').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const res = await fetch(`${API_BASE_URL}/orders/mine/${btn.dataset.id}/download`, {
-            headers: { Authorization: `Bearer ${accessToken}` },
-          });
-          if (!res.ok) { alert('Could not get download link.'); return; }
-          const { url } = await res.json();
-          window.open(url, '_blank');
-        });
-      });
     }
-
-    async function pollUploadStatus(jobId) {
-      const res = await fetch(`${API_BASE_URL}/uploads/${jobId}/status`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const job = await res.json();
-
-      if (job.status === 'succeeded') {
-        document.getElementById('uploadStatus').textContent = 'Order received!';
-        loadOrders();
-      } else if (job.status === 'failed') {
-        document.getElementById('uploadStatus').textContent = `Failed: ${job.error_message}`;
-      } else {
-        document.getElementById('uploadStatus').textContent = `Processing... (${job.status})`;
-        setTimeout(() => pollUploadStatus(jobId), 1500);
-      }
-    }
-
-    document.getElementById('uploadBtn').addEventListener('click', async () => {
-      const file = document.getElementById('fileInput').files[0];
-      if (!file) { document.getElementById('uploadStatus').textContent = 'Choose a file first.'; return; }
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      document.getElementById('uploadStatus').textContent = 'Uploading...';
-      const res = await fetch(`${API_BASE_URL}/uploads`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
-      });
-
-      if (!res.ok) { document.getElementById('uploadStatus').textContent = 'Upload failed.'; return; }
-      const { jobId } = await res.json();
-      pollUploadStatus(jobId);
-    });
 
     (async () => {
       accessToken = await requireRole(['student']);
       if (!accessToken) return;
 
       await loadOrders();
+      await loadNotifications();
 
-      // Live popups: order ready, order moved to waiting list — anything
-      // inserted into notifications for this student.
       const { data: { user } } = await supabaseClient.auth.getUser();
       supabaseClient
         .channel('my-notifications')
@@ -123,7 +113,8 @@
           { event: 'INSERT', schema: 'public', table: 'notifications', filter: `student_id=eq.${user.id}` },
           (payload) => {
             showToast(payload.new.message);
-            loadOrders(); // refresh status/box number shown
+            loadNotifications(); 
+            loadOrders(); 
           }
         )
         .subscribe();

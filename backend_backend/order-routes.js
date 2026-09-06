@@ -12,7 +12,7 @@ const SIGNED_URL_EXPIRY_SECONDS = 60 * 5; // 5 minutes — plenty for a single d
 router.get('/orders/mine', requireProfile, requireRole('student'), async (req, res) => {
   const { data: orders, error } = await supabaseAdmin
     .from('orders')
-    .select('id, order_number, source_filename, status, box_number, version, created_at, updated_at')
+    .select('id, order_number, items, status, box_number, version, created_at, updated_at')
     .eq('student_id', req.user.id)
     .order('created_at', { ascending: false });
 
