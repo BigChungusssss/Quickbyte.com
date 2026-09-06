@@ -1,7 +1,10 @@
 // signin.js
-// Set this to wherever your backend actually runs (same as API_BASE_URL in script.js)
 const API_BASE_URL = "https://quickbyte-com-food-ordering-website.onrender.com";
 const HOME_PAGE = "../index.html";
+
+// Set to true to require 2FA (matches REQUIRE_2FA on the backend — keep both
+// in sync, or the frontend will show/skip steps that the backend disagrees with).
+const REQUIRE_2FA = false;
 
 const stepLogin = document.getElementById('step-login');
 const stepEnroll = document.getElementById('step-enroll');
@@ -17,36 +20,18 @@ function showStep(step) {
   stepChallenge.style.display = step === 'challenge' ? 'block' : 'none';
 }
 
-/**
- * Checks with the backend Express server to verify if the 
- * current authenticated user exists in the class_leader_emails table.
- */
-async function checkAllowedOnBackend() {
+async function whoAmI() {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) return false;
-  
+  if (!session) return null;
+
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/check-allowed`, {
+    const res = await fetch(`${API_BASE_URL}/auth/whoami`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
     });
-    
-    // Safely parse JSON even on HTTP error statuses like 401 or 403
-    const json = await res.json();
-    console.log("Server JSON Payload Received:", json);
-    
-    // Check for HTTP OK status and approval boolean
-    if (!res.ok) {
-      if (json && json.error) {
-        console.warn(`Backend rejected authorization: ${json.error}`);
-      }
-      return false;
-    }
-
-    // Accept either json.ok or json.allowed as valid approval indicators
-    return json.ok === true || json.allowed === true;
-  } catch (error) {
-    console.error("Backend authorization check failed:", error);
-    return false;
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    return null;
   }
 }
 
@@ -55,122 +40,120 @@ async function checkAllowedOnBackend() {
  */
 async function routeAfterAuth() {
   const { data: { session } } = await supabaseClient.auth.getSession();
-  if (!session) { 
-    showStep('login'); 
-    return; 
+  if (!session) {
+    showStep('login');
+    return;
   }
 
-  // // Which "assurance level" is this session at right now vs. the highest available?
-  // const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
-  // const { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
-  
-  // const allTotpFactors = factorsData?.totp || [];
-  // const verifiedTotp = allTotpFactors.find(f => f.status === 'verified');
-  // const unverifiedTotp = allTotpFactors.find(f => f.status === 'unverified');
+  // Which "assurance level" is this session at right now vs. the highest available?
+  if (REQUIRE_2FA) {
+    const { data: aalData } = await supabaseClient.auth.mfa.getAuthenticatorAssuranceLevel();
+    const { data: factorsData } = await supabaseClient.auth.mfa.listFactors();
 
-  // // If no verified factor exists, handle enrollment or resume an unverified factor
-  // if (!verifiedTotp) {
-  //   let enrollmentData;
+    const allTotpFactors = factorsData?.totp || [];
+    const verifiedTotp = allTotpFactors.find(f => f.status === 'verified');
+    const unverifiedTotp = allTotpFactors.find(f => f.status === 'unverified');
 
-  //   if (unverifiedTotp) {
-  //     // Challenge existing unverified factor to obtain validation session without throwing conflict errors
-  //     const { data: challengeData, error: challengeErr } = await supabaseClient.auth.mfa.challenge({ factorId: unverifiedTotp.id });
-  //     if (challengeErr) { 
-  //       msg.textContent = challengeErr.message; 
-  //       return; 
-  //     }
-      
-  //     pendingFactorId = unverifiedTotp.id;
-  //     pendingChallengeId = challengeData.id;
-      
-  //     // Re-enroll to retrieve a fresh QR code payload for the user interface
-  //     const { data: reEnrollData, error: reEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
-  //     if (!reEnrollErr) {
-  //       pendingFactorId = reEnrollData.id;
-  //       enrollmentData = reEnrollData.totp;
-  //     }
-  //   } else {
-  //     // First-time enrollment for new users
-  //     const { data: newEnrollData, error: newEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
-  //     if (newEnrollErr) { 
-  //       msg.textContent = newEnrollErr.message; 
-  //       return; 
-  //     }
-      
-  //     pendingFactorId = newEnrollData.id;
-  //     enrollmentData = newEnrollData.totp;
-  //   }
+    // If no verified factor exists, handle enrollment or resume an unverified factor
+    if (!verifiedTotp) {
+      let enrollmentData;
 
-  //   // Render QR Code & Deep Links if valid registration data is available
-  //   if (enrollmentData) {
-  //     const qrWrap = document.getElementById('qr-wrap');
-  //     qrWrap.innerHTML = ''; // Safely clear out existing loading text
-  //     qrWrap.style.flexDirection = 'column';
+      if (unverifiedTotp) {
+        const { data: challengeData, error: challengeErr } = await supabaseClient.auth.mfa.challenge({ factorId: unverifiedTotp.id });
+        if (challengeErr) {
+          msg.textContent = challengeErr.message;
+          return;
+        }
+        pendingFactorId = unverifiedTotp.id;
+        pendingChallengeId = challengeData.id;
 
-  //     // 1. Create and append responsive QR Image
-  //     const qrImg = document.createElement('img');
-  //     qrImg.src = enrollmentData.qr_code;
-  //     qrImg.alt = "Scan with your authenticator app";
-  //     qrWrap.appendChild(qrImg);
+        const { data: reEnrollData, error: reEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+        if (!reEnrollErr) {
+          pendingFactorId = reEnrollData.id;
+          enrollmentData = reEnrollData.totp;
+        }
+      } else {
+        const { data: newEnrollData, error: newEnrollErr } = await supabaseClient.auth.mfa.enroll({ factorType: 'totp' });
+        if (newEnrollErr) {
+          msg.textContent = newEnrollErr.message;
+          return;
+        }
+        pendingFactorId = newEnrollData.id;
+        enrollmentData = newEnrollData.totp;
+      }
 
-  //     // 2. Build native mobile deep link string
-  //     const userEmail = encodeURIComponent(session.user.email || 'user');
-  //     const issuerName = encodeURIComponent('QuickByte');
-  //     const otpauthUrl = `otpauth://totp/${issuerName}:${userEmail}?secret=${enrollmentData.secret}&issuer=${issuerName}`;
+      if (enrollmentData) {
+        const qrWrap = document.getElementById('qr-wrap');
+        qrWrap.innerHTML = '';
+        qrWrap.style.flexDirection = 'column';
 
-  //     // 3. Create mobile-friendly link button
-  //     const mobileLink = document.createElement('a');
-  //     mobileLink.href = otpauthUrl;
-  //     mobileLink.className = "mobile-only-link"; 
-  //     mobileLink.textContent = "📱 Open in Authenticator App";
-  //     mobileLink.style.cssText = `
-  //       display: inline-block;
-  //       margin-top: 12px;
-  //       font-family: var(--font-mono);
-  //       font-size: 14px;
-  //       color: var(--copper);
-  //       text-decoration: none;
-  //       font-weight: 500;
-  //       padding: 6px 12px;
-  //       border: 1px dashed var(--line);
-  //       border-radius: 4px;
-  //       background: var(--card);
-  //     `;
-      
-  //     mobileLink.onmouseover = () => mobileLink.style.color = 'var(--copper-dk)';
-  //     mobileLink.onmouseout = () => mobileLink.style.color = 'var(--copper)';
+        const qrImg = document.createElement('img');
+        qrImg.src = enrollmentData.qr_code;
+        qrImg.alt = "Scan with your authenticator app";
+        qrWrap.appendChild(qrImg);
 
-  //     qrWrap.appendChild(mobileLink);
-  //   }
+        const userEmail = encodeURIComponent(session.user.email || 'user');
+        const issuerName = encodeURIComponent('QuickByte');
+        const otpauthUrl = `otpauth://totp/${issuerName}:${userEmail}?secret=${enrollmentData.secret}&issuer=${issuerName}`;
 
-  //   showStep('enroll');
-  //   return;
-  // }
+        const mobileLink = document.createElement('a');
+        mobileLink.href = otpauthUrl;
+        mobileLink.className = "mobile-only-link";
+        mobileLink.textContent = "📱 Open in Authenticator App";
+        mobileLink.style.cssText = `
+          display: inline-block;
+          margin-top: 12px;
+          font-family: var(--font-mono);
+          font-size: 14px;
+          color: var(--copper);
+          text-decoration: none;
+          font-weight: 500;
+          padding: 6px 12px;
+          border: 1px dashed var(--line);
+          border-radius: 4px;
+          background: var(--card);
+        `;
+        mobileLink.onmouseover = () => mobileLink.style.color = 'var(--copper-dk)';
+        mobileLink.onmouseout = () => mobileLink.style.color = 'var(--copper)';
 
-  // // Factor exists and is verified, but this session hasn't completed 2FA yet
-  // if (aalData.currentLevel !== 'aal2') {
-  //   const { data, error } = await supabaseClient.auth.mfa.challenge({ factorId: verifiedTotp.id });
-  //   if (error) { 
-  //     msg.textContent = error.message; 
-  //     return; 
-  //   }
-  //   pendingFactorId = verifiedTotp.id;
-  //   pendingChallengeId = data.id;
-  //   showStep('challenge');
-  //   return;
-  // }
+        qrWrap.appendChild(mobileLink);
+      }
 
-  // Fully authenticated (Google OAuth + TOTP 2FA). Check allowlist on backend
-  const allowed = await checkAllowedOnBackend();
-  if (!allowed) {
+      showStep('enroll');
+      return;
+    }
+
+    // Factor exists and is verified, but this session hasn't completed 2FA yet
+    if (aalData.currentLevel !== 'aal2') {
+      const { data, error } = await supabaseClient.auth.mfa.challenge({ factorId: verifiedTotp.id });
+      if (error) {
+        msg.textContent = error.message;
+        return;
+      }
+      pendingFactorId = verifiedTotp.id;
+      pendingChallengeId = data.id;
+      showStep('challenge');
+      return;
+    }
+  }
+
+  // Fully authenticated (Google OAuth, plus 2FA if REQUIRE_2FA is on). Figure
+  // out who they are and send them to the right place.
+  const who = await whoAmI();
+  if (!who || !who.ok) {
     msg.textContent = "This account isn't approved for access. Contact the site admin.";
     await supabaseClient.auth.signOut();
     showStep('login');
     return;
   }
 
-  // Redirect to home page upon success
-  window.location.href = HOME_PAGE;
+  if (who.kind === 'profile' && who.role === 'student') {
+    window.location.href = '../student-dashboard.html';
+  } else if (who.kind === 'profile' && (who.role === 'supplier' || who.role === 'admin')) {
+    window.location.href = '../supplier-dashboard.html';
+  } else {
+    window.location.href = HOME_PAGE; // class leader → main ordering site
+  }
 }
 
 // Event Listeners
@@ -186,22 +169,22 @@ document.getElementById('googleBtn').addEventListener('click', async () => {
 document.getElementById('enrollVerifyBtn').addEventListener('click', async () => {
   msg.textContent = '';
   const code = document.getElementById('enrollCode').value.trim();
-  
+
   const { data: challenge, error: challengeErr } = await supabaseClient.auth.mfa.challenge({ factorId: pendingFactorId });
-  if (challengeErr) { 
-    msg.textContent = challengeErr.message; 
-    return; 
+  if (challengeErr) {
+    msg.textContent = challengeErr.message;
+    return;
   }
-  
+
   const { error } = await supabaseClient.auth.mfa.verify({
     factorId: pendingFactorId,
     challengeId: challenge.id,
     code,
   });
-  
-  if (error) { 
-    msg.textContent = 'Incorrect code — try again.'; 
-    return; 
+
+  if (error) {
+    msg.textContent = 'Incorrect code — try again.';
+    return;
   }
   await routeAfterAuth();
 });
@@ -209,16 +192,16 @@ document.getElementById('enrollVerifyBtn').addEventListener('click', async () =>
 document.getElementById('challengeVerifyBtn').addEventListener('click', async () => {
   msg.textContent = '';
   const code = document.getElementById('challengeCode').value.trim();
-  
+
   const { error } = await supabaseClient.auth.mfa.verify({
     factorId: pendingFactorId,
     challengeId: pendingChallengeId,
     code,
   });
-  
-  if (error) { 
-    msg.textContent = 'Incorrect code — try again.'; 
-    return; 
+
+  if (error) {
+    msg.textContent = 'Incorrect code — try again.';
+    return;
   }
   await routeAfterAuth();
 });

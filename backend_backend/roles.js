@@ -19,7 +19,8 @@ async function requireProfile(req, res, next) {
   }
 
   const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-  if (payload.aal !== 'aal2') {
+  const REQUIRE_2FA = String(process.env.REQUIRE_2FA ?? 'true').toLowerCase() !== 'false';
+  if (REQUIRE_2FA && payload.aal !== 'aal2') {
     await logSecurityEvent({ req, type: 'auth_2fa_incomplete', detail: 'Session missing aal2', email: user.email });
     return res.status(401).json({ error: '2FA required' });
   }
@@ -39,12 +40,13 @@ async function requireProfile(req, res, next) {
   next();
 }
 
-// Use after requireProfile: requireRole('supplier') or requireRole('student')
-function requireRole(role) {
+// Use after requireProfile: requireRole('supplier') or requireRole(['supplier', 'admin'])
+function requireRole(allowed) {
+  const allowedRoles = Array.isArray(allowed) ? allowed : [allowed];
   return (req, res, next) => {
-    if (req.user?.role !== role) {
-      logSecurityEvent({ req, type: 'admin_route_denied', detail: `Required role ${role}, had ${req.user?.role}`, email: req.user?.email });
-      return res.status(403).json({ error: `${role}s only` });
+    if (!allowedRoles.includes(req.user?.role)) {
+      logSecurityEvent({ req, type: 'admin_route_denied', detail: `Required role ${allowedRoles.join('/')}, had ${req.user?.role}`, email: req.user?.email });
+      return res.status(403).json({ error: `${allowedRoles.join(' or ')} only` });
     }
     next();
   };

@@ -53,31 +53,30 @@ async function logSecurityEvent({ req, type, detail, email }) {
 
 /* ---------------- shared token verification ---------------- */
 
-// Verifies the bearer token is a real Supabase session that completed 2FA (aal2).
-// Returns { user } on success, or { errorType, message } on failure — does NOT
-// check class-leader/allowlist membership, so it can be reused by requireDev too.
+// Set REQUIRE_2FA=false in your env to temporarily skip the aal2 check
+// everywhere (requireAuth, requireDev, requireAdminOrDev, requireProfile all
+// go through this function). Defaults to true (require 2FA) if unset, so
+// leaving the env var out entirely keeps the original secure behavior.
+const REQUIRE_2FA = String(process.env.REQUIRE_2FA ?? 'true').toLowerCase() !== 'false';
+
+// Verifies the bearer token is a real Supabase session, optionally requiring
+// 2FA (aal2) per REQUIRE_2FA above. Returns { user } on success, or
+// { errorType, message } on failure — does NOT check class-leader/allowlist
+// membership, so it can be reused by requireDev too.
 async function getVerifiedUser(req) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
   if (!token) return { errorType: 'auth_missing_token', message: 'No bearer token supplied' };
 
-  try {
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    if (error || !user) {
-      return { errorType: 'auth_invalid_token', message: error?.message || 'User does not exist' };
-    }
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) return { errorType: 'auth_invalid_token', message: error?.message };
 
-    // --- RE-ENABLE 2FA CHECK ---
-    // const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-    // if (payload.aal !== 'aal2') {
-    //   return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
-    // }
-    // // ----------------------------
-
-    return { user };
-  } catch (err) {
-    return { errorType: 'auth_invalid_token', message: err.message };
+  if (REQUIRE_2FA) {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
+    if (payload.aal !== 'aal2') return { errorType: 'auth_2fa_incomplete', message: 'Session missing aal2', email: user.email };
   }
+
+  return { user };
 }
 
 /* ---------------- auth middleware ---------------- */
