@@ -130,6 +130,7 @@
 // module.exports = router;
 
 
+// order-create.js
 const express = require('express');
 const cors = require('cors');
 const { requireAuth, authRateLimiter, logSecurityEvent, supabaseAdmin } = require('./auth-and-security');
@@ -140,9 +141,7 @@ router.use(cors()); // the cart page is a different origin than this API
 
 // POST /orders
 // Body: { items: [{ name, variantLabel, price, qty }, ...] }
-// Called by the cart's "Send to supplier" button. Requires a signed-in, 2FA'd
-// student/class leader. Saves the order directly to the database so it appears
-// on the supplier's dashboard.
+// Called by the cart's checkout button. Requires a signed-in student/class leader.
 router.post('/orders', authRateLimiter, requireAuth, async (req, res) => {
   const { items } = req.body;
 
@@ -151,15 +150,15 @@ router.post('/orders', authRateLimiter, requireAuth, async (req, res) => {
     return res.status(400).json({ error: 'items must be a non-empty array' });
   }
 
-  // Calculate the total for reference if needed
+  // Calculate the total cost from the items array
   const total = items.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.qty) || 0), 0);
 
-  // 1. Insert the order directly into Supabase
+  // 1. Insert the order directly into Supabase using the validated session
   const { data: newOrder, error: orderErr } = await supabaseAdmin
     .from('orders')
     .insert({
       student_id: req.user.id,
-      class_leader_id: req.user.class_leader_id || null,
+      class_leader_id: req.user.leaderId || null, // Corrected property mapping matching auth-and-security.js
       items: items,
       total: total,
       status: 'pending_fulfillment', // Matches the supplier dashboard status workflow

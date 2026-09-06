@@ -1,8 +1,8 @@
 // order-routes.js
 const express = require('express');
-const { supabaseAdmin } = require('./auth-and-security');
+const { supabaseAdmin, authRateLimiter, logSecurityEvent } = require('./auth-and-security');
 const { requireProfile, requireRole } = require('./roles');
-const { releaseBoxForOrder } = require('./box-logic');
+const { releaseBoxForOrder, tryAssignBox } = require('./box-logic');
 
 const router = express.Router();
 
@@ -18,6 +18,43 @@ router.get('/orders/mine', requireProfile, requireRole('student'), async (req, r
 
   if (error) return res.status(500).json({ error: 'Failed to load orders' });
   res.json({ orders });
+});
+
+// POST /orders — create a new order from the cart page
+router.post('/orders', authRateLimiter, requireProfile, requireRole('student'), async (req, res) => {
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    await logSecurityEvent({ req, type: 'bad_input', detail: 'Empty or invalid items array', email: req.user.email });
+    return res.status(400).json({ error: 'items must be a non-empty array' });
+  }
+
+  const total = items.reduce((sum, it) => sum + (Number(it.price) || 0) * (Number(it.qty) || 0), 0);
+
+  const { data: newOrder, error: orderErr } = await supabaseAdmin
+    .from('orders')
+    .insert({
+      student_id: req.user.id,
+      class_leader_id: req.user.leaderId || null,
+      items: items,
+      total: total,
+      status: 'pending_fulfillment',
+    })
+    .select()
+    .single();
+
+  if (orderErr) {
+    console.error('Failed to save order to database:', orderErr);
+    return res.status(500).json({ error: 'Failed to save order' });
+  }
+
+  const assignedBox = await tryAssignBox(newOrder.id);
+
+  res.status(201).json({ 
+    id: newOrder.id, 
+    boxNumber: assignedBox ? assignedBox.box_number : null, 
+    status: newOrder.status 
+  });
 });
 
 // GET /orders/mine/:id/download  (student) — signed URL to their own file
