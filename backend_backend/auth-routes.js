@@ -36,7 +36,8 @@ router.get('/auth/whoami', async (req, res) => {
   if (error || !user) return res.status(401).json({ error: 'Not authenticated' });
 
   const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString('utf8'));
-  if (payload.aal !== 'aal2') return res.status(401).json({ error: '2FA required' });
+  const REQUIRE_2FA = String(process.env.REQUIRE_2FA ?? 'true').toLowerCase() !== 'false';
+  if (REQUIRE_2FA && payload.aal !== 'aal2') return res.status(401).json({ error: '2FA required' });
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
