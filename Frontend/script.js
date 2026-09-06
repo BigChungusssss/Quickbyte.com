@@ -325,14 +325,6 @@ document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
     return;
   }
  
-  const emailInput = document.getElementById('customerEmail');
-  const customerEmail = emailInput ? emailInput.value.trim() : '';
-  if(!customerEmail || !customerEmail.includes('@')){
-    if(errorEl) errorEl.textContent = 'Enter a valid email first.';
-    if(emailInput) emailInput.focus();
-    return;
-  }
- 
   const checkoutBtn = document.getElementById('checkoutBtn');
   checkoutBtn.disabled = true;
   const originalLabel = checkoutBtn.textContent;
@@ -340,13 +332,18 @@ document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
  
   try{
     const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) {
+      window.location.href = 'Sign/signin.html';
+      return;
+    }
+
     const res = await fetch(`${API_BASE_URL}/orders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        'Authorization': `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ customerEmail, items: order }),
+      body: JSON.stringify({ items: order }), // Only sending items now!
     });
  
     if(!res.ok){
@@ -360,8 +357,7 @@ document.getElementById('checkoutBtn').addEventListener('click', async ()=>{
     await saveCart();
     renderDrawer();
     closeDrawer();
-    if(emailInput) emailInput.value = '';
-    showModal('Order sent!', `Box ${data.boxNumber} has been assigned. You'll get an email with your pickup code once the supplier marks it ready.`);
+    showModal('Order sent!', `Box ${data.boxNumber} has been assigned. Your order has been submitted successfully!`);
   }catch(err){
     console.error('Failed to send order:', err);
     if(errorEl) errorEl.textContent = 'Could not send the order — check your connection and try again.';
