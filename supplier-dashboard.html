@@ -42,16 +42,19 @@
       document.getElementById('orders').innerHTML = Object.entries(groups).map(([leaderName, group]) => `
         <h3 style="margin-top:24px;border-bottom:1px solid #ccc;padding-bottom:4px;">${leaderName}</h3>
         ${group.map(o => `
-          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:10px;">
-            <strong>Order #${o.order_number}</strong> — ${o.status.replace('_', ' ')}
-            ${o.box_number ? ` — Box ${o.box_number}` : ''}
+          <div style="border:1px solid #ddd;border-radius:6px;padding:12px;margin-bottom:10px;background:#fff;">
+            <strong>Order #${o.order_number}</strong> — <strong>Status:</strong> ${o.status.replace('_', ' ')}
+            ${o.box_number ? ` — 📦 Box ${o.box_number}` : ''}
             <span style="color:#888;font-size:12px;"> (v${o.version}, ${new Date(o.created_at).toLocaleString()})</span>
-            ${o.cart_items ? `
+            
+            <!-- Fixed from cart_items to items -->
+            ${o.items && Array.isArray(o.items) ? `
               <ul style="margin:8px 0;padding-left:18px;font-size:13px;">
-                ${o.cart_items.map(it => `<li>${it.name}${it.variantLabel ? ` (${it.variantLabel})` : ''} × ${it.qty}</li>`).join('')}
+                ${o.items.map(it => `<li><strong>${it.name}</strong>${it.variantLabel ? ` (${it.variantLabel})` : ''} × ${it.qty}</li>`).join('')}
               </ul>
-            ` : `<div style="font-size:13px;color:#666;">${o.source_filename || ''}</div>`}
-            <div style="margin-top:8px;display:flex;gap:8px;">
+            ` : `<div style="font-size:13px;color:#666;margin-top:6px;">No items listed</div>`}
+
+            <div style="margin-top:12px;display:flex;gap:8px;">
               ${o.file_storage_path ? `<button data-action="download" data-id="${o.id}">Download file</button>` : ''}
               ${o.status !== 'ready' && o.status !== 'picked_up'
                 ? `<button data-action="ready" data-id="${o.id}">Mark ready</button>`
@@ -62,7 +65,7 @@
             </div>
           </div>
         `).join('')}
-      `).join('');
+      `).join('') || '<p>No orders found.</p>';
  
       document.querySelectorAll('[data-action="download"]').forEach(btn => {
         btn.addEventListener('click', async () => {
@@ -98,10 +101,6 @@
  
       await fetchOrders();
  
-      // Two separate concerns: refetch the list on ANY change (so status/box
-      // updates reflect live), but only pop up a toast for brand-new orders
-      // — not for edits, ready-toggles, or pickups, per the "only notifs for
-      // new orders" requirement.
       supabaseClient
         .channel('supplier-orders')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, (payload) => {
