@@ -46,23 +46,13 @@ async function logSecurityEvent({ req, type, detail, email }) {
 
   if (entry.count === ALERT_THRESHOLD) {
     console.warn(`ALERT: ${entry.count} flagged requests from ${ip} in the last minute (latest: ${type})`);
-    // Optional: wire this to email.js/Resend to actually notify you, e.g.
-    // const { sendOrderExpiredNotice } = require('./email'); // or a dedicated sendSecurityAlert()
   }
 }
 
 /* ---------------- shared token verification ---------------- */
 
-// Set REQUIRE_2FA=false in your env to temporarily skip the aal2 check
-// everywhere (requireAuth, requireDev, requireAdminOrDev, requireProfile all
-// go through this function). Defaults to true (require 2FA) if unset, so
-// leaving the env var out entirely keeps the original secure behavior.
 const REQUIRE_2FA = String(process.env.REQUIRE_2FA ?? 'true').toLowerCase() !== 'false';
 
-// Verifies the bearer token is a real Supabase session, optionally requiring
-// 2FA (aal2) per REQUIRE_2FA above. Returns { user } on success, or
-// { errorType, message } on failure — does NOT check class-leader/allowlist
-// membership, so it can be reused by requireDev too.
 async function getVerifiedUser(req) {
   const authHeader = req.headers.authorization || '';
   const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
@@ -81,8 +71,6 @@ async function getVerifiedUser(req) {
 
 /* ---------------- auth middleware ---------------- */
 
-// Protects any route: verifies the Supabase JWT, requires a full (Google + 2FA) session,
-// and checks the caller's email against the class-leader allowlist. Attaches req.user.
 async function requireAuth(req, res, next) {
   const { user, errorType, message, email } = await getVerifiedUser(req);
   if (!user) {
@@ -114,7 +102,6 @@ async function requireAuth(req, res, next) {
   next();
 }
 
-// Extra gate for admin-only routes (e.g. the security log viewer). Use after requireAuth.
 function requireAdmin(req, res, next) {
   if (!req.user?.isAdmin) {
     logSecurityEvent({ req, type: 'admin_route_denied', detail: 'Non-admin attempted admin route', email: req.user?.email });
@@ -123,9 +110,6 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-// Gate for routes both admins AND devs should see (currently: the security log).
-// Checks DEV_EMAILS first (no class_leaders row needed), then falls back to the
-// is_admin flag on a class_leaders row. Either one is enough.
 async function requireAdminOrDev(req, res, next) {
   const { user, errorType, message, email } = await getVerifiedUser(req);
   if (!user) {
@@ -153,13 +137,8 @@ async function requireAdminOrDev(req, res, next) {
   next();
 }
 
-/* ---------------- dev-only gate ---------------- */
+/* ---------------- dev-only gate (Now also allows Admins) ---------------- */
 
-// The dev area (adding/removing class leaders) is restricted to a hardcoded list of
-// emails set in the environment — completely separate from the class_leaders table,
-// so it works even before any leader exists, and no class leader (even an admin one)
-// can grant themselves this access by editing a database row.
-// .env: DEV_EMAILS=you@gmail.com,you@wits.ac.za
 const DEV_EMAILS = (process.env.DEV_EMAILS || '')
   .split(',')
   .map(e => e.trim().toLowerCase())
@@ -172,18 +151,30 @@ async function requireDev(req, res, next) {
     return res.status(401).json({ error: errorType === 'auth_2fa_incomplete' ? '2FA required' : 'Not authenticated' });
   }
 
-  if (!DEV_EMAILS.includes(user.email.toLowerCase())) {
-    await logSecurityEvent({ req, type: 'dev_area_denied', detail: 'Non-dev attempted dev-only route', email: user.email });
-    return res.status(403).json({ error: 'Dev access only' });
+  // 1. Check if user is in DEV_EMAILS
+  if (DEV_EMAILS.includes(user.email.toLowerCase())) {
+    req.user = { id: user.id, email: user.email, isDev: true };
+    return next();
   }
 
-  req.user = { id: user.id, email: user.email, isDev: true };
-  next();
+  // 2. Check if user has an 'admin' role in profiles table
+  const { data: profile, error } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!error && profile && profile.role === 'admin') {
+    req.user = { id: user.id, email: user.email, isAdmin: true };
+    return next();
+  }
+
+  await logSecurityEvent({ req, type: 'dev_area_denied', detail: 'Non-dev/non-admin attempted dev route', email: user.email });
+  return res.status(403).json({ error: 'Dev or Admin access only' });
 }
 
 /* ---------------- general hardening ---------------- */
 
-// Rate limit anything sensitive — tune the numbers to your real traffic.
 const authRateLimiter = rateLimit({
   windowMs: 60_000,
   max: 20,
@@ -193,20 +184,16 @@ const authRateLimiter = rateLimit({
   },
 });
 
-// Call this once in your main server file: applyHardening(app, { allowedOrigin: 'https://a.com,https://b.com' })
-// allowedOrigin can be a single URL or a comma-separated list (e.g. your live
-// site plus http://127.0.0.1:5500 for local testing with Live Server).
 function applyHardening(app, { allowedOrigin }) {
   const allowedOrigins = (allowedOrigin || '').split(',').map(o => o.trim()).filter(Boolean);
   app.use(helmet());
   app.use(cors({
     origin: (origin, callback) => {
-      // requests with no Origin header (e.g. curl, server-to-server) are allowed through
       if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
       callback(new Error('Not allowed by CORS'));
     },
   }));
-  app.set('trust proxy', 1); // needed for req.ip / x-forwarded-for to be accurate behind a proxy/host
+  app.set('trust proxy', 1);
 }
 
 module.exports = {
