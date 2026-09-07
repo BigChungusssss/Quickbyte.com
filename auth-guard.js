@@ -91,6 +91,10 @@ async function applySignInUI(accessToken) {
       document.body.appendChild(link);
     };
 
+    if (isDev || profileIsAdmin) {
+      addSecretLink('devShortcutLink', 'dev/leaders.html', 'dev', 8);
+    }
+
     if (isDev) {
       // Devs get both: leaders management and the security log.
       addSecretLink('devShortcutLink', 'dev/leaders.html', 'dev', 8);
